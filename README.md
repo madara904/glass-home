@@ -1,8 +1,8 @@
 <h1 align="center">Glass Home</h1>
 
 <p align="center">
-  Debloat your Amazon Fire TV and give it a calm glass home screen, from your PC or Mac.<br>
-  No ads on the home screen, no root, and everything can be undone.
+  <b>Remove ads from your Fire TV Stick.</b> A one-click debloater and a clean glass home screen,<br>
+  from Windows or Mac. No root, no terminal, and everything can be undone.
 </p>
 
 <p align="center">
