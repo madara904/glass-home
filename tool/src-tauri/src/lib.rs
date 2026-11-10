@@ -235,7 +235,7 @@ pub fn run_cli(task: &str, ip: &str, data: Option<&str>) -> bool {
         }
         "ui" => {
             let st = device::state(&adb, d.sdk);
-            let o = ui::Options { layout: st.layout, tiles: st.tiles };
+            let o = ui::Options { layout: st.layout, tiles: st.tiles, theme: st.theme };
             ui::run(&adb, d.sdk, &base.join("glass-home.apk"), &o, &mut ui_steps(None))
         }
         "restore" => restore::run(&adb, d.sdk, &dir, &mut restore_steps(None)),

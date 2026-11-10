@@ -244,3 +244,93 @@ button.row:disabled::before { opacity: 0; }
   opacity: 0; transform: translateY(6px); animation: word .6s var(--ease) 1s forwards;
 }
 @keyframes word { to { opacity: 1; transform: none; } }
+
+/* ---------- colour swatches: a little TV per scheme, tile at rest and in focus ---------- */
+.swatches { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; padding: 0 10px; }
+.swatch { padding: 8px; }
+.swatch .thumb { height: 52px; border-radius: 10px; }
+.swatch .thumb::after { display: none; }
+.swatch .thumb i { position: absolute; z-index: 1; top: 16px; height: 20px; border-radius: 5px; }
+.swatch .thumb i.g { left: 10px; width: 26px; box-shadow: inset 0 1px 0 rgba(255,255,255,.35); }
+.swatch .thumb i.f { left: 42px; width: 30px; }
+.swatch span { margin-top: 7px; font-size: 13.5px; text-align: center; padding-left: 0; }
+.sw-neutral, .sw-auto, .sw-mint, .sw-sand { background: url(/wall.jpg) 50% 50% / cover; }
+.sw-neutral i.g { background: rgba(255,255,255,.22); }
+.sw-neutral i.f { background: rgba(255,255,255,.62); }
+.sw-auto i.g { background: rgba(214,182,150,.32); }
+.sw-auto i.f { background: rgba(232,196,160,.80); }
+.sw-auto::before { content: "A"; position: absolute; right: 7px; bottom: 4px; z-index: 1; font-size: 11px; font-weight: 600; color: rgba(255,255,255,.9); }
+.sw-mint i.g { background: rgba(170,236,220,.30); }
+.sw-mint i.f { background: rgba(150,232,212,.82); }
+.sw-sand i.g { background: rgba(255,214,170,.32); }
+.sw-sand i.f { background: rgba(255,206,150,.84); }
+.sw-lavender {
+  background:
+    radial-gradient(60% 80% at 15% 20%, rgba(169,159,240,.75), transparent 72%),
+    radial-gradient(60% 80% at 90% 90%, rgba(143,216,200,.75), transparent 72%),
+    linear-gradient(315deg, #dff4ee, #e7ecf8 50%, #e4defa);
+}
+.sw-lavender i.g { background: rgba(255,255,255,.55); }
+.sw-lavender i.f { background: rgba(255,255,255,.96); box-shadow: 0 2px 6px -2px rgba(27,34,51,.3); }
+
+/* ==========================================================================
+   Layout system. One left edge (72 px), one inset inside panels (36 px), five text sizes
+   (48 title, 28 panel title, 16 body, 14 small, 12 label) and an 8 px spacing grid.
+   Every screen starts its title at the same height under the top bar, instead of being
+   centred, so tall screens never run into the bar and short ones don't jump around.
+   ========================================================================== */
+:root { --edge: 72px; --inset: 36px; }
+
+/* ---- the left column ---- */
+.side { justify-content: flex-start; padding-top: 128px; padding-bottom: 80px; overflow-y: auto; }
+h1 { font-size: 48px; line-height: 1.06; letter-spacing: -1.2px; }
+.sub { margin-top: 12px; font-size: 16px; line-height: 1.5; max-width: 440px; }
+.sub + .list, .sub + .found, .sub + .field { margin-top: 24px; }
+.list { margin-top: 24px; }
+.found { margin-top: 24px; }
+.found .list { margin-top: 0; }
+.row .name { font-size: 18px; }
+.row.small .name { font-size: 16px; }
+.row .value { font-size: 14px; }
+.row .path { font-size: 13px; margin-top: 2px; }
+.row .path.mono { font-size: 12px; }
+.row.static { height: 62px; }
+.below { margin-top: 16px; gap: 20px; min-height: 0; }
+.below > .quiet:first-child { margin-left: -6px; }
+.quiet, .aside, .foot, .error, .hint { font-size: 14px; }
+.foot { margin-top: 16px; }
+.error { margin-top: 8px; min-height: 20px; }
+.manual { margin-top: 32px; }
+.manual .label { margin: 0 0 8px; padding: 0; font-size: 14px; letter-spacing: 0; text-transform: none; color: var(--mute); font-weight: 400; }
+.manual .field { margin-top: 0; }
+.manual .hint { margin-top: 8px; color: var(--faint); }
+.field { height: 56px; border-radius: 28px; padding: 4px 4px 4px 24px; }
+.field input { font-size: 17px; }
+.field .go, .below .go { height: 48px; border-radius: 24px; padding: 0 24px; font-size: 15px; }
+.byline { left: var(--edge); bottom: 20px; }
+.byline .quiet { font-size: 13px; }
+
+/* ---- the panel: heading, rows, labels, notes and buttons share one inset ---- */
+.panel header { padding: 32px var(--inset) 4px; }
+.panel h2 { font-size: 28px; letter-spacing: -.5px; }
+.panel header p { margin-top: 8px; font-size: 15px; line-height: 1.5; }
+.panel .body { padding: 8px 20px 24px;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+          mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent); }
+.panel .row { padding: 0 16px; }
+.panel .row.small { height: 56px; }
+.panel .label { padding: 24px 16px 8px; font-size: 12px; }
+.panel .note { padding: 8px 16px 0; font-size: 14px; line-height: 1.5; }
+.panel .step { padding: 0 16px; font-size: 16px; min-height: 48px; }
+.panel .summary { margin: 16px 16px 0; font-size: 14px; }
+.panel footer { padding: 16px var(--inset) 28px; }
+.panel footer .quiet { margin-left: -6px; }
+.panel footer .go { height: 48px; border-radius: 24px; padding: 0 24px; font-size: 15px; }
+.choices { padding: 0 6px; gap: 8px; }
+.choice { padding: 10px; }
+.choice span { font-size: 14px; margin-top: 8px; }
+.swatches { padding: 0 6px; gap: 2px; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.swatch { padding: 10px 8px; }
+.swatch span { font-size: 13px; margin-top: 8px; }
+/* Titles fit on one line at 48 px; the line breaks in the texts were for the old 56 px. */
+.side h1 br { display: none; }

@@ -62,7 +62,10 @@ final class Stage extends View {
         static final String MATERIAL = "glass.material", CONTROLS = "glass.controls", FONT = "glass.font",
                 NAMES = "glass.names", DATE = "glass.date", AMAZON = "glass.amazon", LAYOUT = "glass.layout",
                 POSITION = "glass.position", STYLE = "glass.style", TILES = "glass.tiles", TEXT = "glass.text",
-                HOME = "glass.home", ICONS = "glass.icons";
+                HOME = "glass.home", ICONS = "glass.icons", THEME = "glass.theme";
+        /** Colour theme: 0 neutral, 1 auto (accent from the wallpaper), 2 mint, 3 sand, 4 lavender. */
+        int theme;
+        static final String[] THEMES = {"neutral", "auto", "mint", "sand", "lavender"};
         /** soft, frost, clear: which pre-rendered glass the dock is made of. */
         int material;
         /** 0 dock, 1 list with names, 2 icons only. */
@@ -95,7 +98,99 @@ final class Stage extends View {
     private static final float LIFT = 1.1f;
     // Cards are rendered once at the largest size they are shown at: a lifted large tile.
     private static final int CARD_W = 396, CARD_H = 223;
-    private static final int INK = 0xFFF6F1E7, SOLID = 0xFFF3F3EF, SOLID_INK = 0xFF141618;
+    private static final int LIGHT_INK = 0xFFF6F1E7, SOLID = 0xFFF3F3EF, SOLID_INK = 0xFF141618;
+    private static final int DARK_INK = 0xFF1B2233, MINT = 0xFF96E8D4, SAND = 0xFFFFCE96, SAND_MARK = 0xFFFFE2BD;
+    private static final int LAVENDER_MARK = 0xFF2A3150;
+
+    // ---------------------------------------------------------------- colour theme
+    // Neutral keeps every colour as it always was: white glass, warm white text and marks.
+
+    /** Text and control colour. */
+    private int INK = LIGHT_INK;
+    /** Colour of the white marks on glass tiles and of the settings icons' ink. */
+    private int markInk = LIGHT_INK;
+    /** Tint of resting glass and of focused glass; white is plain glass. */
+    private int glassTint = Color.WHITE, focusTint = Color.WHITE;
+    /** How far glass leans to its tint at rest and in focus. */
+    private float glassMix, focusMix;
+    /** Lavender: a light colour field instead of a photo, light glass, dark text, no dark shading. */
+    private boolean lightTheme;
+    /** The wallpaper's own accent, measured when it loads; the Auto theme tints the glass with it. */
+    private int autoAccent = Color.WHITE;
+    private Bitmap gradient;
+
+    private void applyTheme() {
+        int t = prefs.theme;
+        lightTheme = t == 4;
+        INK = lightTheme ? DARK_INK : LIGHT_INK;
+        markInk = t == 3 ? SAND_MARK : lightTheme ? LAVENDER_MARK : LIGHT_INK;
+        int accent = t == 1 ? autoAccent : t == 2 ? MINT : t == 3 ? SAND : Color.WHITE;
+        glassTint = focusTint = accent;
+        glassMix = t == 1 || t == 2 || t == 3 ? .55f : 0;
+        focusMix = t == 1 || t == 2 || t == 3 ? .78f : 0;
+        if (lightTheme && gradient == null) gradient = makeGradient();
+        icons.clear();
+        cards.clear();
+        shaders.clear();
+    }
+
+    /** The app icon's colours as a soft field, like the desktop tool: lavender, blue and mint. */
+    private static Bitmap makeGradient() {
+        int w = 960, h = 540;
+        Bitmap b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(b);
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
+        // linear-gradient(315deg, #dff4ee, #e7ecf8 50%, #e4defa): from bottom right to top left.
+        p.setShader(new LinearGradient(w, h, 0, 0, new int[] {0xFFDFF4EE, 0xFFE7ECF8, 0xFFE4DEFA},
+                new float[] {0, .5f, 1}, Shader.TileMode.CLAMP));
+        c.drawRect(0, 0, w, h, p);
+        blob(c, p, .12f * w, .18f * h, .48f * w, .62f * h, Color.argb(178, 169, 159, 240));
+        blob(c, p, .46f * w, .04f * h, .42f * w, .55f * h, Color.argb(128, 127, 151, 230));
+        blob(c, p, .92f * w, .88f * h, .50f * w, .60f * h, Color.argb(178, 143, 216, 200));
+        blob(c, p, .70f * w, .46f * h, .38f * w, .48f * h, Color.argb(87, 95, 182, 201));
+        return b;
+    }
+
+    private static void blob(Canvas c, Paint p, float x, float y, float rx, float ry, int color) {
+        android.graphics.RadialGradient g = new android.graphics.RadialGradient(0, 0, 1,
+                new int[] {color, color & 0x00FFFFFF}, new float[] {0, .72f}, Shader.TileMode.CLAMP);
+        Matrix m = new Matrix();
+        m.setScale(rx, ry);
+        m.postTranslate(x, y);
+        g.setLocalMatrix(m);
+        p.setShader(g);
+        c.drawRect(0, 0, c.getWidth(), c.getHeight(), p);
+    }
+
+    /**
+     * The photo's accent: the hue its colourful parts share, weighted by how colourful and how
+     * light each sample is, brought to a calm saturation. Plain white when the photo is grey.
+     */
+    static int accentOf(Bitmap p) {
+        if (p == null) return Color.WHITE;
+        Rect crop = Walls.crop(p);
+        double hx = 0, hy = 0, weight = 0, sat = 0;
+        float[] hsv = new float[3];
+        int stepX = Math.max(1, crop.width() / 48), stepY = Math.max(1, crop.height() / 27);
+        for (int y = crop.top; y < crop.bottom; y += stepY) {
+            for (int x = crop.left; x < crop.right; x += stepX) {
+                Color.colorToHSV(p.getPixel(x, y), hsv);
+                if (hsv[2] < .18f) continue;
+                double w = hsv[1] * hsv[1] * hsv[2];
+                double a = Math.toRadians(hsv[0]);
+                hx += Math.cos(a) * w;
+                hy += Math.sin(a) * w;
+                sat += hsv[1] * w;
+                weight += w;
+            }
+        }
+        if (weight < 1e-3) return Color.WHITE;
+        double strength = Math.hypot(hx, hy) / weight;
+        if (strength < .2) return Color.WHITE;
+        float hue = (float) ((Math.toDegrees(Math.atan2(hy, hx)) + 360) % 360);
+        float s = (float) Math.max(.32, Math.min(.5, sat / weight));
+        return Color.HSVToColor(new float[] {hue, s, .92f});
+    }
     private static final int MOVE_MS = 200, FADE_MS = 160, SLIDE_MS = 240;
     private static final long LONG_PRESS_MS = 550, STATUS_MS = 3200;
     private static final Interpolator EASE = new PathInterpolator(.2f, .7f, .2f, 1f);
@@ -298,17 +393,32 @@ final class Stage extends View {
 
     /** CleanFrame's glass: linear-gradient(170deg, a, b 58%, c) in white, for a w x h box. */
     private LinearGradient glassShader(float w, float h, float a, float b, float c) {
-        String key = Math.round(w) + "x" + Math.round(h) + "/" + a + "/" + b + "/" + c;
+        return glassShader(w, h, a, b, c, Color.WHITE);
+    }
+
+    /** The same glass in a tint ({@code rgb}); white is plain glass. */
+    private LinearGradient glassShader(float w, float h, float a, float b, float c, int rgb) {
+        String key = Math.round(w) + "x" + Math.round(h) + "/" + a + "/" + b + "/" + c + "/" + rgb;
         LinearGradient g = shaders.get(key);
         if (g == null) {
             double rad = Math.toRadians(170);
             float dx = (float) Math.sin(rad), dy = (float) -Math.cos(rad);
             float len = Math.abs(w * dx) + Math.abs(h * dy), cx = w / 2, cy = h / 2;
             g = new LinearGradient(cx - dx * len / 2, cy - dy * len / 2, cx + dx * len / 2, cy + dy * len / 2,
-                    new int[] {white(a), white(b), white(c)}, new float[] {0, .58f, 1}, Shader.TileMode.CLAMP);
+                    new int[] {tint(rgb, a), tint(rgb, b), tint(rgb, c)}, new float[] {0, .58f, 1}, Shader.TileMode.CLAMP);
             shaders.put(key, g);
         }
         return g;
+    }
+
+    private static int tint(int rgb, float alpha) {
+        return Color.argb(Math.round(Math.max(0, Math.min(1, alpha)) * 255), Color.red(rgb), Color.green(rgb), Color.blue(rgb));
+    }
+
+    /** The glass colour for a pane at focus strength {@code s}: white for Neutral and Lavender. */
+    private int glassColour(float s) {
+        int rest = blend(Color.WHITE, glassTint, glassMix), on = blend(Color.WHITE, focusTint, focusMix);
+        return blend(rest, on, s);
     }
 
     /** inset 0 1px 0: the light crescent along the top of a rounded shape. */
@@ -331,13 +441,18 @@ final class Stage extends View {
      * lays a smoky base under it first, so glass stays visible over a bright photograph.
      */
     private void pane(Canvas c, float w, float h, float r, float strength, float alpha, float dark) {
-        if (dark > 0) {
+        if (dark > 0 && !lightTheme) {
             glass.setShader(null);
             glass.setColor(Color.argb(Math.round(dark * alpha * 255), 8, 10, 14));
             c.drawRoundRect(0, 0, w, h, r, r, glass);
         }
         float s = strength;
-        glass.setShader(glassShader(w, h, .20f + .30f * s, .08f + .24f * s, .12f + .26f * s));
+        if (lightTheme) {
+            // Frosted white on the light field: denser at rest, nearly solid in focus.
+            glass.setShader(glassShader(w, h, .50f + .46f * s, .30f + .50f * s, .40f + .50f * s));
+        } else {
+            glass.setShader(glassShader(w, h, .20f + .30f * s, .08f + .24f * s, .12f + .26f * s, glassColour(s)));
+        }
         glass.setAlpha(Math.round(alpha * 255));
         c.drawRoundRect(0, 0, w, h, r, r, glass);
         glass.setShader(null);
@@ -378,6 +493,10 @@ final class Stage extends View {
 
     /** Text over a photograph: a short, soft shadow so it reads on mist and on rock. */
     private void photoShadow(float alpha) {
+        if (lightTheme) {
+            text.clearShadowLayer();
+            return;
+        }
         text.setShadowLayer(7, 0, 1.5f, Color.argb(Math.round(130 * alpha), 6, 8, 10));
     }
 
@@ -436,6 +555,7 @@ final class Stage extends View {
     void setPrefs(Prefs p, boolean fire) {
         prefs = p;
         fireHome = fire;
+        applyTheme();
         loadFonts();
         geometry();
         slides.clear();
@@ -458,18 +578,26 @@ final class Stage extends View {
         final int token = ++wallToken;
         Runnable job = () -> {
             Context c = getContext();
-            Bitmap p = Walls.photo(c, i), s = Walls.soft(c, i), f = Walls.frost(c, i);
-            boolean light = p != null && topIsLight(p);
+            Bitmap p0 = Walls.photo(c, i), s0 = Walls.soft(c, i), f0 = Walls.frost(c, i);
+            boolean light0 = p0 != null && topIsLight(p0);
+            int accent = accentOf(p0);
             Runnable apply = () -> {
                 if (token != wallToken) return;
+                // Lavender shows its colour field in place of the photo, in the glass too.
+                boolean field = lightTheme && gradient != null;
+                Bitmap p = field ? gradient : p0, s = field ? gradient : s0, f = field ? gradient : f0;
                 photo = p;
                 photoCrop = p == null ? null : Walls.crop(p);
-                photoLight = light;
+                photoLight = !field && light0;
                 soft = s;
                 frost = f;
                 softShader = s == null ? null : new BitmapShader(s, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
                 frostShader = f == null ? null : new BitmapShader(f, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
                 photoShader = p == null ? null : new BitmapShader(p, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
+                if (accent != autoAccent) {
+                    autoAccent = accent;
+                    if (prefs.theme == 1) applyTheme();
+                }
                 invalidate();
             };
             if (now) apply.run();
@@ -568,7 +696,7 @@ final class Stage extends View {
         float[] m = id == null ? null : Marks.of(id);
         if (m != null) {
             Drawable d = getContext().getDrawable(Marks.res(id)).mutate();
-            d.setTint(INK);
+            d.setTint(markInk);
             float w = CARD_W * .46f, h = CARD_H * .46f, size = CARD_H * .40f;
             float weight = Math.max(.84f, Math.min(1.25f, (float) Math.pow(.45 / m[4], .3)));
             float k = Math.min(Math.min(w / m[2], h / m[3]), size * weight / (float) Math.sqrt(m[2] * m[3]));
@@ -592,7 +720,7 @@ final class Stage extends View {
                 int s = Math.round(CARD_H * .5f * 1.5f);
                 fg.setBounds((CARD_W - s) / 2, (CARD_H - s) / 2, (CARD_W + s) / 2, (CARD_H + s) / 2);
                 fg.draw(c);
-                c.drawColor(INK, android.graphics.PorterDuff.Mode.SRC_IN);
+                c.drawColor(markInk, android.graphics.PorterDuff.Mode.SRC_IN);
                 if (coverage(b) < .55f) return new Card(b, false);
                 b.eraseColor(Color.TRANSPARENT);
             }
@@ -600,7 +728,7 @@ final class Stage extends View {
         text.setTypeface(semibold);
         text.setTextSize(40);
         text.setLetterSpacing(-.015f);
-        text.setColor(INK);
+        text.setColor(markInk);
         text.clearShadowLayer();
         text.setTextAlign(Paint.Align.CENTER);
         String n = TextUtils.ellipsize(it.label, text, CARD_W - 60, TextUtils.TruncateAt.END).toString();
@@ -762,11 +890,22 @@ final class Stage extends View {
     private void drawFrost(Canvas c) {
         if (frost != null) c.drawBitmap(frost, null, stageRect, image);
         else drawPhoto(c);
-        c.drawColor(Color.argb(Math.round(Math.max(.32f, Walls.frostVeil(wall) + .16f) * 255), 12, 10, 8));
+        // Lavender's field is light already: a thin white veil instead of the dark one.
+        if (lightTheme) c.drawColor(white(.22f));
+        else c.drawColor(Color.argb(Math.round(Math.max(.32f, Walls.frostVeil(wall) + .16f) * 255), 12, 10, 8));
     }
 
     private void drawHome(Canvas c, int m) {
         drawPhoto(c);
+        if (lightTheme) {
+            // Dark text on a light field needs no shading.
+        } else {
+            drawShades(c, m);
+        }
+        drawHomeContent(c, m);
+    }
+
+    private void drawShades(Canvas c, int m) {
         c.drawRect(0, 0, W, 360, photoLight ? shadeLight : shade);
         if (!listLayout(m)) c.drawRect(0, 560, W, H, scrim);
         else {
@@ -774,6 +913,9 @@ final class Stage extends View {
             // Its own paint: the shared fill carries the focused control's alpha.
             c.drawRect(0, 0, 1000, H, listShade);
         }
+    }
+
+    private void drawHomeContent(Canvas c, int m) {
         if (m == HOME) {
             drawClock(c);
             drawControls(c);
@@ -1139,16 +1281,16 @@ final class Stage extends View {
         mx.setScale(820, 300);
         mx.postTranslate(x + 360, cy);
         heroDim.getShader().setLocalMatrix(mx);
-        c.drawRect(x - 500, cy - 320, W, cy + 320, heroDim);
+        if (!lightTheme) c.drawRect(x - 500, cy - 320, W, cy + 320, heroDim);
         // Out, then in, in place: moving text and two names on top of each other read as jitter.
         if (heroPrev != null && f < HERO_OUT) drawHeroText(c, heroPrev, x, cy, heroOutA(f) * show, 0);
         drawHeroText(c, heroId, x, cy, heroInA(f) * show, 0);
 
         textStyle(medium, 20, .2f, INK);
         text.setAlpha(205);
-        text.setShadowLayer(8, 0, 1.5f, Color.argb(160, 4, 6, 8));
+        if (!lightTheme) text.setShadowLayer(8, 0, 1.5f, Color.argb(160, 4, 6, 8));
         text.setTextAlign(Paint.Align.RIGHT);
-        c.drawText(Walls.name(wall), W - 150, baseline(H - 72, 28), text);
+        c.drawText(lightTheme ? t("Lavendel", "Lavender") : Walls.name(wall), W - 150, baseline(H - 72, 28), text);
         text.clearShadowLayer();
         text.setAlpha(255);
     }
@@ -1170,7 +1312,7 @@ final class Stage extends View {
         int shadowA = Math.round(170 * a);
         textStyle(medium, 100, -3f, INK);
         text.setAlpha(Math.round(a * 255));
-        text.setShadowLayer(18, 0, 2, Color.argb(shadowA, 4, 6, 8));
+        if (!lightTheme) text.setShadowLayer(18, 0, 2, Color.argb(shadowA, 4, 6, 8));
         String name = TextUtils.ellipsize(it.label, text, 860, TextUtils.TruncateAt.END).toString();
         c.drawText(name, x, baseline(cy - 120 + dy, 120), text);
         float y = cy + 8 + dy;
@@ -1333,12 +1475,12 @@ final class Stage extends View {
 
     // ---------------------------------------------------------------- settings
 
-    private static final int R_WALL = 0, R_LAYOUT = 1, R_POSITION = 2, R_STYLE = 3, R_TILES = 4, R_ICONS = 5,
-            R_GLASS = 6, R_CONTROLS = 7, R_NAMES = 8, R_CLOCK = 9, R_FONT = 10, R_TEXT = 11, R_DOCK = 12,
-            R_AMAZON = 13, R_FIREHOME = 14, R_FIRE = 15, SET_ROWS = 20;
+    private static final int R_WALL = 0, R_THEME = 1, R_LAYOUT = 2, R_POSITION = 3, R_STYLE = 4, R_TILES = 5,
+            R_ICONS = 6, R_GLASS = 7, R_CONTROLS = 8, R_NAMES = 9, R_CLOCK = 10, R_FONT = 11, R_TEXT = 12,
+            R_DOCK = 13, R_AMAZON = 14, R_FIREHOME = 15, R_FIRE = 16, SET_ROWS = 21;
     /** First row of each section: home screen, type, apps, Fire TV. */
     private static final int[] SECTIONS = {R_WALL, R_FONT, R_DOCK, R_FIREHOME};
-    private static final int[] SET_ICONS = {R.drawable.mk_art, R.drawable.ic_s_layout, R.drawable.ic_s_position,
+    private static final int[] SET_ICONS = {R.drawable.mk_art, R.drawable.ic_s_color, R.drawable.ic_s_layout, R.drawable.ic_s_position,
             R.drawable.ic_s_style, R.drawable.ic_s_tiles, R.drawable.ic_s_mono, R.drawable.ic_s_glass, R.drawable.ic_s_buttons,
             R.drawable.ic_s_names, R.drawable.ic_s_clock, R.drawable.ic_s_font, R.drawable.ic_s_size,
             R.drawable.ic_s_dock, R.drawable.mk_apps, R.drawable.ic_s_firehome, R.drawable.ic_s_wifi,
@@ -1356,6 +1498,7 @@ final class Stage extends View {
     private String setLabel(int i) {
         switch (i) {
             case R_WALL: return t("Hintergrund", "Background");
+            case R_THEME: return t("Farben", "Colours");
             case R_LAYOUT: return "Layout";
             case R_POSITION: return "Position";
             case R_STYLE: return t("Dock-Stil", "Dock style");
@@ -1378,13 +1521,24 @@ final class Stage extends View {
         }
     }
 
+    private String themeName(int v) {
+        switch (v) {
+            case 1: return "Auto";
+            case 2: return "Mint";
+            case 3: return "Sand";
+            case 4: return t("Lavendel", "Lavender");
+            default: return "Neutral";
+        }
+    }
+
     private String size(int v) {
         return v == 0 ? t("Klein", "Small") : v == 2 ? t("Groß", "Large") : t("Mittel", "Medium");
     }
 
     private String setValue(int i) {
         switch (i) {
-            case R_WALL: return Walls.name(wall);
+            case R_WALL: return lightTheme ? t("Farbverlauf", "Colour field") : Walls.name(wall);
+            case R_THEME: return themeName(prefs.theme);
             case R_LAYOUT: return prefs.layout == 2 ? "Icons" : prefs.layout == 1 ? t("Liste", "List") : "Dock";
             case R_POSITION: return prefs.position == 2 ? t("Oben", "Top")
                     : prefs.position == 1 ? t("Mitte", "Middle") : t("Unten", "Bottom");
@@ -1409,6 +1563,8 @@ final class Stage extends View {
         switch (i) {
             case R_WALL: return t("Das Foto hinter dem Home-Bildschirm. Das Glas nimmt seine Farben auf.",
                     "The photo behind the home screen. The glass takes on its colours.");
+            case R_THEME: return t("Neutral ist klares Glas. Auto nimmt die Farbe des Hintergrunds, Mint und Sand tönen das Glas kühl oder warm, Lavendel ist hell mit dunkler Schrift.",
+                    "Neutral is clear glass. Auto takes its colour from the background, Mint and Sand tint the glass cool or warm, Lavender is light with dark text.");
             case R_LAYOUT: return t("Dock: eine Reihe Kacheln. Liste: eine Spalte mit Bild und Namen. Icons: nur die Icons, der Name erscheint beim Fokus daneben.",
                     "Dock: a row of tiles. List: a column with picture and name. Icons: icons only, the name appears beside the focused one.");
             case R_POSITION: return t("Wo Dock oder Liste sitzen: unten, in der Mitte oder oben.",
@@ -1828,6 +1984,15 @@ final class Stage extends View {
             case R_WALL:
                 openWalls(SETTINGS);
                 break;
+            case R_THEME: {
+                boolean wasLight = lightTheme;
+                prefs.theme = cycle(prefs.theme, Prefs.THEMES.length);
+                applyTheme();
+                // Into or out of Lavender: the photo and its glass layers change with it.
+                if (wasLight != lightTheme) loadWall(wall, true);
+                host.prefChanged(Prefs.THEME, Prefs.THEMES[prefs.theme]);
+                break;
+            }
             case R_LAYOUT:
                 prefs.layout = cycle(prefs.layout, 3);
                 host.prefChanged(Prefs.LAYOUT, prefs.layout == 2 ? "icons" : prefs.layout == 1 ? "list" : "dock");
@@ -1974,6 +2139,11 @@ final class Stage extends View {
     }
 
     private void openWalls(int from) {
+        if (lightTheme) {
+            say(t("Lavendel hat einen Farbverlauf statt eines Fotos. Für Fotos unter Farben ein anderes Schema wählen.",
+                    "Lavender uses a colour field instead of a photo. Pick another colour scheme for photos."));
+            return;
+        }
         wallsFrom = from;
         mode = WALLS;
         wallBefore = wall;

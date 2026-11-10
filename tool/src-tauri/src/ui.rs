@@ -16,7 +16,13 @@ use std::time::Duration;
 pub struct Options {
     pub layout: String,
     pub tiles: String,
+    /// Colour scheme: neutral, auto, mint, sand or lavender; empty keeps what the TV has.
+    #[serde(default)]
+    pub theme: String,
 }
+
+/// The launcher's colour schemes (Stage.Prefs.THEMES), as stored in glass.theme.
+pub const THEMES: [&str; 5] = ["neutral", "auto", "mint", "sand", "lavender"];
 
 const GUARD: &str = "app.glasshome.tv/app.glasshome.tv.Guard";
 const LEGACY_GUARD: &str = "tv.dumbtv.home/tv.dumbtv.home.Guard";
@@ -61,6 +67,9 @@ pub fn run(adb: &Adb, sdk: u32, apk: &Path, o: &Options, s: &mut Steps) -> bool 
     };
     set(&mut conf, "glass.layout", match o.layout.as_str() { "list" => "list", "icons" => "icons", _ => "dock" });
     set(&mut conf, "glass.icons", if o.tiles == "glass" { "glass" } else { "banner" });
+    if THEMES.contains(&o.theme.as_str()) {
+        set(&mut conf, "glass.theme", o.theme.as_str());
+    }
     let text = conf.iter().map(|(k, v)| format!("{k}={v}")).collect::<Vec<_>>().join("\n") + "\n";
     let local = std::env::temp_dir().join(format!("glasshome-conf-{}.txt", std::process::id()));
     let pushed = std::fs::write(&local, text).map_err(|e| e.to_string()).and_then(|_| adb.push(&local, &device::config_path(sdk, GLASS)));

@@ -1,4 +1,4 @@
-import { api, type App, type DebloatOptions, type Device, type Found, type DeviceState, type Step, type UiOptions } from './api';
+import { api, THEMES, type App, type DebloatOptions, type Device, type Found, type DeviceState, type Step, type UiOptions, type Theme } from './api';
 import { flag, icon, mark } from './icons';
 import { lang, setLang, t, tr, type Lang } from './i18n';
 import { AUTHORS, REPO, openDevtools, openGithub, windowAction, windowButtons } from './titlebar';
@@ -15,7 +15,8 @@ let open: string | null = null;
 let view: () => void = () => {};
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
-const lines = (s: string) => esc(s).replace(/\n/g, '<br>');
+// A space before each break, so a title still reads right where the stylesheet hides the break.
+const lines = (s: string) => esc(s).replace(/\n/g, ' <br>');
 
 const INTRO = 'glasshome.intro';
 const introSeen = () => { try { return localStorage.getItem(INTRO) === '1'; } catch { return false; } };
@@ -265,7 +266,7 @@ async function debloatPanel() {
 }
 
 function uiPanel() {
-  const o: UiOptions = { layout: state?.layout ?? 'dock', tiles: state?.tiles ?? 'original' };
+  const o: UiOptions = { layout: state?.layout ?? 'dock', tiles: state?.tiles ?? 'original', theme: state?.theme ?? 'neutral' };
   const thumbs: Record<UiOptions['layout'], string> = {
     dock: '<i class="g" style="left:14%;right:14%;bottom:9px;height:20px"></i><i style="left:20%;bottom:13px;width:14%;height:12px"></i><i style="left:37%;bottom:13px;width:14%;height:12px"></i><i style="left:54%;bottom:13px;width:14%;height:12px"></i>',
     list: '<i class="g" style="left:9px;top:10px;width:58%;height:15px"></i><i style="left:13px;top:13px;width:14px;height:9px"></i><i style="left:13px;top:31px;width:14px;height:9px;opacity:.6"></i><i style="left:13px;top:49px;width:14px;height:9px;opacity:.6"></i>',
@@ -278,6 +279,10 @@ function uiPanel() {
       <div class="label">${t.layout}</div>
       <div class="choices">${(Object.keys(thumbs) as UiOptions['layout'][]).map((k) =>
         `<button class="choice ${k === o.layout ? 'on' : ''}" data-layout="${k}"><div class="thumb">${thumbs[k]}</div><span>${t[k]}</span></button>`).join('')}</div>
+      <div class="label">${t.colours}</div>
+      <div class="swatches">${THEMES.map((k) =>
+        `<button class="choice swatch ${k === o.theme ? 'on' : ''}" data-theme="${k}"><div class="thumb sw-${k}"><i class="g"></i><i class="f"></i></div><span>${t.themeName[k]}</span></button>`).join('')}</div>
+      <p class="note">${t.coloursNote}</p>
       <div class="label">${t.tiles}</div>
       ${option('tiles', t.look, tilesLabel())}
     </div>
@@ -285,6 +290,10 @@ function uiPanel() {
   panel.querySelectorAll<HTMLElement>('[data-layout]').forEach((b) => b.addEventListener('click', () => {
     o.layout = b.dataset.layout as UiOptions['layout'];
     panel.querySelectorAll('[data-layout]').forEach((x) => x.classList.toggle('on', x === b));
+  }));
+  panel.querySelectorAll<HTMLElement>('[data-theme]').forEach((b) => b.addEventListener('click', () => {
+    o.theme = b.dataset.theme as Theme;
+    panel.querySelectorAll('[data-theme]').forEach((x) => x.classList.toggle('on', x === b));
   }));
   panel.querySelector('[data-opt=tiles]')!.addEventListener('click', (e) => {
     o.tiles = o.tiles === 'original' ? 'glass' : 'original';

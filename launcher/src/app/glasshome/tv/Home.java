@@ -80,8 +80,9 @@ public final class Home extends Activity implements Stage.Host {
         setContentView(stage);
         stage.requestFocus();
         // Both are read before the first frame, so HOME never shows an empty dock or a bare colour.
-        stage.setWall(Walls.index(cfg.get(WALL, Walls.IDS[0])));
+        // The colour scheme first: Lavender replaces the photo, and Auto measures it as it loads.
         stage.setPrefs(prefs(), fireHome());
+        stage.setWall(Walls.index(cfg.get(WALL, Walls.IDS[0])));
         showApps(Catalog.apps(this));
 
         IntentFilter f = new IntentFilter();
@@ -113,6 +114,7 @@ public final class Home extends Activity implements Stage.Host {
         p.text = level(cfg.get(Stage.Prefs.TEXT, "normal"));
         String f = cfg.get(Stage.Prefs.FONT, "geist");
         p.font = "newsreader".equals(f) ? 1 : "system".equals(f) ? 2 : 0;
+        p.theme = Math.max(0, java.util.Arrays.asList(Stage.Prefs.THEMES).indexOf(cfg.get(Stage.Prefs.THEME, "neutral")));
         return p;
     }
 

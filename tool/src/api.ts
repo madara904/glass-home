@@ -30,6 +30,7 @@ export interface DeviceState {
   glassVersion?: string;
   layout: 'dock' | 'list' | 'icons';
   tiles: 'original' | 'glass';
+  theme: Theme;
 }
 
 export interface App {
@@ -45,9 +46,14 @@ export interface DebloatOptions {
   remove: string[];
 }
 
+/** The launcher's colour schemes, as stored in glass.theme on the TV. */
+export type Theme = 'neutral' | 'auto' | 'mint' | 'sand' | 'lavender';
+export const THEMES: Theme[] = ['neutral', 'auto', 'mint', 'sand', 'lavender'];
+
 export interface UiOptions {
   layout: 'dock' | 'list' | 'icons';
   tiles: 'original' | 'glass';
+  theme: Theme;
 }
 
 export type StepState = 'pending' | 'running' | 'done' | 'failed' | 'skipped';
@@ -83,7 +89,7 @@ const mockDevice: Device = {
   serial: '192.168.1.20:5555', ip: '192.168.1.20', model: 'AFTSS',
   name: 'Fire TV Stick Lite', fireOs: 'Fire OS 7', sdk: 28, supported: true,
 };
-const mockState: DeviceState = { debloated: true, disabled: 34, dnsFilter: true, glassUi: true, glassVersion: '1.0', layout: 'icons', tiles: 'original' };
+const mockState: DeviceState = { debloated: true, disabled: 34, dnsFilter: true, glassUi: true, glassVersion: '1.0', layout: 'icons', tiles: 'original', theme: 'neutral' };
 const mockApps: App[] = [
   { pkg: 'com.ionitech.airscreen', label: 'AirScreen' },
   { pkg: 'com.disney.disneyplus', label: 'Disney+' },
