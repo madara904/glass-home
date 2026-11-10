@@ -121,6 +121,9 @@ export const api = {
     inTauri ? invoke('connect', { ip }) : wait(900).then(() => ({ ...mockDevice, ip, serial: ip + ':5555' })),
   state: (): Promise<DeviceState> => (inTauri ? invoke('device_state') : wait(300).then(() => mockState)),
   apps: (): Promise<App[]> => (inTauri ? invoke('user_apps') : wait(300).then(() => mockApps)),
+  /** The owner's photo (a 1920 x 1080 JPEG) as the TV's wallpaper, with a colour scheme. */
+  setWallpaper: (jpeg: Uint8Array, theme: Theme): Promise<void> =>
+    inTauri ? invoke<void>('set_wallpaper', { image: Array.from(jpeg), theme }) : wait(1200).then(() => undefined),
   disconnect: (): Promise<void> => (inTauri ? invoke('disconnect') : Promise.resolve()),
   debloat: (o: DebloatOptions, onStep: (s: Step) => void) =>
     inTauri ? runTask('run_debloat', { options: o }, onStep)

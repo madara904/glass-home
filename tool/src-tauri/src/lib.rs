@@ -133,6 +133,14 @@ async fn run_install_ui(app: AppHandle, options: ui::Options, ctx: State<'_, Ctx
     .await
 }
 
+/// The owner's photo as the TV's wallpaper, with a colour scheme; see ui::send_wallpaper.
+#[tauri::command]
+async fn set_wallpaper(image: Vec<u8>, theme: String, ctx: State<'_, Ctx>) -> Res<()> {
+    current(&ctx)?;
+    let adb = ctx.adb.clone();
+    blocking(move || ui::send_wallpaper(&adb, &image, &theme)).await?
+}
+
 #[tauri::command]
 async fn run_restore(app: AppHandle, ctx: State<'_, Ctx>) -> Res<bool> {
     let d = current(&ctx)?;
@@ -204,6 +212,39 @@ pub fn probe(ip: &str) {
     println!("{}", serde_json::to_string_pretty(&device::user_apps(&adb, &aapt2_path(&base), &cache)).unwrap_or_default());
 }
 
+/// `--wallpaper <ip> <photo.jpg> [scheme]`: the window's own-photo upload, from the command line.
+pub fn wallpaper_cli(ip: &str, photo: &str, theme: &str) -> bool {
+    let base = match bundled::unpack(&std::env::temp_dir().join("glasshome-cli")) {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("could not unpack adb: {e}");
+            return false;
+        }
+    };
+    let adb = Adb::new(adb_path(&base));
+    if let Err(e) = adb.connect(ip) {
+        eprintln!("{e}");
+        return false;
+    }
+    let jpeg = match std::fs::read(photo) {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("{photo}: {e}");
+            return false;
+        }
+    };
+    match ui::send_wallpaper(&adb, &jpeg, theme) {
+        Ok(()) => {
+            println!("sent {} KB, scheme {theme}", jpeg.len() / 1024);
+            true
+        }
+        Err(e) => {
+            eprintln!("{e}");
+            false
+        }
+    }
+}
+
 /// `--run ui|debloat|restore <ip> [data dir]`: the same task as the window's button, steps printed.
 /// Debloat runs with the defaults the window starts with (keep Prime, Alexa, updates; DNS
 /// filter on; remove nothing); Glass UI keeps the TV's current layout.
@@ -249,6 +290,19 @@ pub fn run_cli(task: &str, ip: &str, data: Option<&str>) -> bool {
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
+            // Windows 11: the frameless window keeps rounded corners, without the shadow the
+            // system frame would bring.
+            #[cfg(windows)]
+            if let Some(w) = app.get_webview_window("main") {
+                if let Ok(hwnd) = w.hwnd() {
+                    use windows_sys::Win32::Graphics::Dwm::{DwmSetWindowAttribute, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND};
+                    let round = DWMWCP_ROUND;
+                    // Older Windows simply ignores the attribute.
+                    unsafe {
+                        DwmSetWindowAttribute(hwnd.0 as _, DWMWA_WINDOW_CORNER_PREFERENCE as u32, &round as *const _ as _, 4);
+                    }
+                }
+            }
             // adb, aapt2 and the APK are inside the program; they are unpacked next to its data.
             let data = app.path().app_data_dir()?;
             std::fs::create_dir_all(&data)?;
@@ -258,7 +312,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            discover, connect, disconnect, device_state, user_apps, run_debloat, run_install_ui, run_restore, open_github, open_devtools
+            discover, connect, disconnect, device_state, user_apps, run_debloat, run_install_ui, run_restore, set_wallpaper, open_github, open_devtools
         ])
         .run(tauri::generate_context!())
         .expect("Glass Home could not start");

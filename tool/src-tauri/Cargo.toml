@@ -27,3 +27,7 @@ opt-level = "s"
 lto = true
 codegen-units = 1
 strip = true
+
+[target.'cfg(windows)'.dependencies]
+# Rounded corners for the frameless window without the heavy shadow (DwmSetWindowAttribute).
+windows-sys = { version = "0.61", features = ["Win32_Graphics_Dwm"] }

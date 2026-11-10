@@ -62,7 +62,14 @@ final class Stage extends View {
         static final String MATERIAL = "glass.material", CONTROLS = "glass.controls", FONT = "glass.font",
                 NAMES = "glass.names", DATE = "glass.date", AMAZON = "glass.amazon", LAYOUT = "glass.layout",
                 POSITION = "glass.position", STYLE = "glass.style", TILES = "glass.tiles", TEXT = "glass.text",
-                HOME = "glass.home", ICONS = "glass.icons", THEME = "glass.theme";
+                HOME = "glass.home", ICONS = "glass.icons", THEME = "glass.theme",
+                SLIDE = "glass.slide", SLIDE_EVERY = "glass.slide.every", SLIDE_ORDER = "glass.slide.order",
+                SLIDES = "glass.slides";
+        /** Slideshow: on or off, minutes between photos (index into EVERY), shuffled or in order, and its photos. */
+        boolean slideOn, slideShuffle;
+        int slideEvery = 1;
+        static final int[] EVERY = {5, 15, 30, 60};
+        final List<String> slides = new ArrayList<>();
         /** Colour theme: 0 neutral, 1 auto (accent from the wallpaper), 2 mint, 3 sand, 4 lavender. */
         int theme;
         static final String[] THEMES = {"neutral", "auto", "mint", "sand", "lavender"};
@@ -276,7 +283,9 @@ final class Stage extends View {
     private Rect photoCrop;
     private boolean photoLight;
     private BitmapShader softShader, frostShader, photoShader;
-    private final Card[] thumbCards = new Card[Walls.IDS.length];
+    private final Card[] thumbCards = new Card[Walls.IDS.length + 1];
+    /** Wallpapers in the picker: the fifteen, plus the own photo when one is there. */
+    private int wallCount = Walls.IDS.length;
     private int wall, wallBefore, wallToken;
     private boolean thumbsLoading;
 
@@ -569,6 +578,12 @@ final class Stage extends View {
         invalidate();
     }
 
+    /** The own photo was replaced: drop its thumbnail and reload it if it is the wallpaper. */
+    void customPhotoChanged() {
+        thumbCards[Walls.CUSTOM] = null;
+        if (wall == Walls.CUSTOM) loadWall(wall, false);
+    }
+
     void setWall(int i) {
         wall = i;
         loadWall(i, true);
@@ -578,7 +593,10 @@ final class Stage extends View {
         final int token = ++wallToken;
         Runnable job = () -> {
             Context c = getContext();
-            Bitmap p0 = Walls.photo(c, i), s0 = Walls.soft(c, i), f0 = Walls.frost(c, i);
+            Bitmap p0 = Walls.photo(c, i);
+            // The own photo has no materials shipped: they are made from it here, once.
+            Bitmap s0 = i == Walls.CUSTOM ? Walls.blurred(p0, 6) : Walls.soft(c, i);
+            Bitmap f0 = i == Walls.CUSTOM ? Walls.blurred(p0, 12) : Walls.frost(c, i);
             boolean light0 = p0 != null && topIsLight(p0);
             int accent = accentOf(p0);
             Runnable apply = () -> {
@@ -628,6 +646,7 @@ final class Stage extends View {
         thumbsLoading = true;
         io.execute(() -> {
             for (int i = 0; i < thumbCards.length; i++) {
+                if (thumbCards[i] != null) continue;
                 Bitmap b = Walls.thumb(getContext(), i);
                 if (b == null) continue;
                 Bitmap card = Bitmap.createBitmap(CARD_W, CARD_H, Bitmap.Config.ARGB_8888);
@@ -827,7 +846,7 @@ final class Stage extends View {
     }
 
     private int dockCount(int m) {
-        return m == WALLS ? Walls.IDS.length : dock.size();
+        return m == WALLS ? wallCount : dock.size();
     }
 
     private void placeDock(boolean animate) {
@@ -923,8 +942,8 @@ final class Stage extends View {
             title(c, t("Anordnen", "Arrange"), t("Pfeiltasten verschieben · OK fertig",
                     "Arrows move · OK done"), true);
         } else {
-            title(c, t("Hintergrund", "Background"), t("OK übernimmt · Zurück verwirft",
-                    "OK keeps it · Back cancels"), true);
+            title(c, t("Hintergrund", "Background"), t("OK übernimmt · Halten oder Menütaste: zur Diashow · Zurück verwirft",
+                    "OK keeps it · Hold OK or Menu: add to the slideshow · Back cancels"), true);
         }
         if (listLayout(m) && prefs.layout == 1) drawRows(c, m);
         else if (listLayout(m)) drawList(c, m);
@@ -1115,6 +1134,7 @@ final class Stage extends View {
                 float extra = m == ARRANGE && i == dockI ? 1 : 0;
                 if (m == WALLS) {
                     drawCard(c, thumbCards[i], Walls.name(i), left0 + i * pitch, ty, tw, th, e, extra, dim);
+                    if (prefs.slides.contains(Walls.id(i))) slideMark(c, left0 + i * pitch + tw, ty, e);
                 } else {
                     Item it = dock.get(i);
                     float tx = left0 + slid("d" + it.id, i * pitch, 0)[0];
@@ -1390,6 +1410,27 @@ final class Stage extends View {
         c.restore();
     }
 
+/** The slideshow tick at a photo's top right corner, lifted with the tile like the tile itself. */
+    private void slideMark(Canvas c, float right, float top, float e) {
+        float r = 17, lift = 6 * e, cx = right - 18 + 4 * e, cy = top + 18 - lift - 4 * e;
+        c.save();
+        c.translate(cx - r, cy - r);
+        pane(c, 2 * r, 2 * r, r, .9f, 1, .25f);
+        c.restore();
+        fill.setColor(INK);
+        fill.setAlpha(255);
+        fill.setStyle(Paint.Style.STROKE);
+        fill.setStrokeWidth(2.6f);
+        fill.setStrokeCap(Paint.Cap.ROUND);
+        fill.setStrokeJoin(Paint.Join.ROUND);
+        Path tick = new Path();
+        tick.moveTo(cx - 6.5f, cy + .5f);
+        tick.lineTo(cx - 2, cy + 5);
+        tick.lineTo(cx + 7, cy - 5);
+        c.drawPath(tick, fill);
+        fill.setStyle(Paint.Style.FILL);
+    }
+
     /** linear-gradient(135deg, white .30, transparent 44%) over the tile. */
     private LinearGradient sheenShader(float w, float h) {
         String key = "sheen" + Math.round(w) + "x" + Math.round(h);
@@ -1475,22 +1516,48 @@ final class Stage extends View {
 
     // ---------------------------------------------------------------- settings
 
-    private static final int R_WALL = 0, R_THEME = 1, R_LAYOUT = 2, R_POSITION = 3, R_STYLE = 4, R_TILES = 5,
-            R_ICONS = 6, R_GLASS = 7, R_CONTROLS = 8, R_NAMES = 9, R_CLOCK = 10, R_FONT = 11, R_TEXT = 12,
-            R_DOCK = 13, R_AMAZON = 14, R_FIREHOME = 15, R_FIRE = 16, SET_ROWS = 21;
-    /** First row of each section: home screen, type, apps, Fire TV. */
-    private static final int[] SECTIONS = {R_WALL, R_FONT, R_DOCK, R_FIREHOME};
-    private static final int[] SET_ICONS = {R.drawable.mk_art, R.drawable.ic_s_color, R.drawable.ic_s_layout, R.drawable.ic_s_position,
-            R.drawable.ic_s_style, R.drawable.ic_s_tiles, R.drawable.ic_s_mono, R.drawable.ic_s_glass, R.drawable.ic_s_buttons,
-            R.drawable.ic_s_names, R.drawable.ic_s_clock, R.drawable.ic_s_font, R.drawable.ic_s_size,
-            R.drawable.ic_s_dock, R.drawable.mk_apps, R.drawable.ic_s_firehome, R.drawable.ic_s_wifi,
-            R.drawable.ic_s_display, R.drawable.ic_s_remote, R.drawable.mk_apps, R.drawable.ic_s_device};
+    // Background (photo, colours, slideshow) · Layout · Display · Apps · Fire TV.
+    private static final int R_WALL = 0, R_THEME = 1, R_SLIDE = 2, R_SLIDE_EVERY = 3, R_SLIDE_ORDER = 4,
+            R_LAYOUT = 5, R_POSITION = 6, R_STYLE = 7, R_TILES = 8, R_ICONS = 9, R_GLASS = 10,
+            R_CONTROLS = 11, R_NAMES = 12, R_CLOCK = 13, R_FONT = 14, R_TEXT = 15,
+            R_DOCK = 16, R_AMAZON = 17, R_FIREHOME = 18, R_FIRE = 19, SET_ROWS = 24;
+    /** First row of each section. */
+    private static final int[] SECTIONS = {R_WALL, R_LAYOUT, R_CONTROLS, R_DOCK, R_FIREHOME};
+    private static int setIcon(int i) {
+        switch (i) {
+            case R_WALL: return R.drawable.mk_art;
+            case R_THEME: return R.drawable.ic_s_color;
+            case R_SLIDE: return R.drawable.ic_s_display;
+            case R_SLIDE_EVERY: return R.drawable.ic_s_clock;
+            case R_SLIDE_ORDER: return R.drawable.ic_s_layout;
+            case R_LAYOUT: return R.drawable.ic_s_layout;
+            case R_POSITION: return R.drawable.ic_s_position;
+            case R_STYLE: return R.drawable.ic_s_style;
+            case R_TILES: return R.drawable.ic_s_tiles;
+            case R_ICONS: return R.drawable.ic_s_mono;
+            case R_GLASS: return R.drawable.ic_s_glass;
+            case R_CONTROLS: return R.drawable.ic_s_buttons;
+            case R_NAMES: return R.drawable.ic_s_names;
+            case R_CLOCK: return R.drawable.ic_s_clock;
+            case R_FONT: return R.drawable.ic_s_font;
+            case R_TEXT: return R.drawable.ic_s_size;
+            case R_DOCK: return R.drawable.ic_s_dock;
+            case R_AMAZON: return R.drawable.mk_apps;
+            case R_FIREHOME: return R.drawable.ic_s_firehome;
+            case R_FIRE: return R.drawable.ic_s_wifi;
+            case R_FIRE + 1: return R.drawable.ic_s_display;
+            case R_FIRE + 2: return R.drawable.ic_s_remote;
+            case R_FIRE + 3: return R.drawable.mk_apps;
+            default: return R.drawable.ic_s_device;
+        }
+    }
 
     private String sectionName(int k) {
         switch (k) {
-            case 0: return t("HOME-BILDSCHIRM", "HOME SCREEN");
-            case 1: return t("SCHRIFT", "TYPE");
-            case 2: return "APPS";
+            case 0: return t("HINTERGRUND", "BACKGROUND");
+            case 1: return "LAYOUT";
+            case 2: return t("ANZEIGE", "DISPLAY");
+            case 3: return "APPS";
             default: return "FIRE TV";
         }
     }
@@ -1499,6 +1566,9 @@ final class Stage extends View {
         switch (i) {
             case R_WALL: return t("Hintergrund", "Background");
             case R_THEME: return t("Farben", "Colours");
+            case R_SLIDE: return t("Diashow", "Slideshow");
+            case R_SLIDE_EVERY: return t("Wechsel", "Change");
+            case R_SLIDE_ORDER: return t("Reihenfolge", "Order");
             case R_LAYOUT: return "Layout";
             case R_POSITION: return "Position";
             case R_STYLE: return t("Dock-Stil", "Dock style");
@@ -1539,6 +1609,13 @@ final class Stage extends View {
         switch (i) {
             case R_WALL: return lightTheme ? t("Farbverlauf", "Colour field") : Walls.name(wall);
             case R_THEME: return themeName(prefs.theme);
+            case R_SLIDE: {
+                int n = prefs.slides.size();
+                String photos = n + (de ? (n == 1 ? " Bild" : " Bilder") : (n == 1 ? " photo" : " photos"));
+                return prefs.slideOn ? t("An · ", "On · ") + photos : t("Aus · ", "Off · ") + photos;
+            }
+            case R_SLIDE_EVERY: return t("alle ", "every ") + Prefs.EVERY[prefs.slideEvery] + " min";
+            case R_SLIDE_ORDER: return prefs.slideShuffle ? t("Gemischt", "Shuffled") : t("Der Reihe nach", "In order");
             case R_LAYOUT: return prefs.layout == 2 ? "Icons" : prefs.layout == 1 ? t("Liste", "List") : "Dock";
             case R_POSITION: return prefs.position == 2 ? t("Oben", "Top")
                     : prefs.position == 1 ? t("Mitte", "Middle") : t("Unten", "Bottom");
@@ -1563,6 +1640,12 @@ final class Stage extends View {
         switch (i) {
             case R_WALL: return t("Das Foto hinter dem Home-Bildschirm. Das Glas nimmt seine Farben auf.",
                     "The photo behind the home screen. The glass takes on its colours.");
+            case R_SLIDE: return t("Wechselt den Hintergrund von selbst. Fotos kommen in die Diashow: unter Hintergrund OK gedrückt halten oder die Menütaste drücken.",
+                    "Changes the background by itself. Add photos under Background: hold OK or press the Menu button on one.");
+            case R_SLIDE_EVERY: return t("Wie lange jedes Foto bleibt, bevor das nächste kommt.",
+                    "How long each photo stays before the next one.");
+            case R_SLIDE_ORDER: return t("Die Fotos der Reihe nach, oder in zufälliger Folge.",
+                    "The photos in order, or at random.");
             case R_THEME: return t("Neutral ist klares Glas. Auto nimmt die Farbe des Hintergrunds, Mint und Sand tönen das Glas kühl oder warm, Lavendel ist hell mit dunkler Schrift.",
                     "Neutral is clear glass. Auto takes its colour from the background, Mint and Sand tint the glass cool or warm, Lavender is light with dark text.");
             case R_LAYOUT: return t("Dock: eine Reihe Kacheln. Liste: eine Spalte mit Bild und Namen. Icons: nur die Icons, der Name erscheint beim Fokus daneben.",
@@ -1640,7 +1723,7 @@ final class Stage extends View {
         c.save();
         c.translate(310, 330);
         pane(c, 340, 340, 84, 0, 1, 0);
-        Drawable d = icon(SET_ICONS[setI]);
+        Drawable d = icon(setIcon(setI));
         d.setBounds(95, 95, 245, 245);
         d.setAlpha(235);
         d.draw(c);
@@ -1893,7 +1976,7 @@ final class Stage extends View {
             }
             case WALLS:
                 if (dx != 0) {
-                    int to = Math.max(0, Math.min(Walls.IDS.length - 1, wallI + dx));
+                    int to = Math.max(0, Math.min(wallCount - 1, wallI + dx));
                     if (to != wallI) {
                         wallI = to;
                         wall = to;
@@ -1993,6 +2076,23 @@ final class Stage extends View {
                 host.prefChanged(Prefs.THEME, Prefs.THEMES[prefs.theme]);
                 break;
             }
+            case R_SLIDE:
+                if (!prefs.slideOn && prefs.slides.size() < 2) {
+                    say(t("Erst zwei Fotos in die Diashow legen: unter Hintergrund OK halten oder Menütaste",
+                            "Add two photos first: under Background, hold OK or press Menu"));
+                    break;
+                }
+                prefs.slideOn = !prefs.slideOn;
+                host.prefChanged(Prefs.SLIDE, prefs.slideOn ? "on" : "off");
+                break;
+            case R_SLIDE_EVERY:
+                prefs.slideEvery = cycle(prefs.slideEvery, Prefs.EVERY.length);
+                host.prefChanged(Prefs.SLIDE_EVERY, String.valueOf(Prefs.EVERY[prefs.slideEvery]));
+                break;
+            case R_SLIDE_ORDER:
+                prefs.slideShuffle = !prefs.slideShuffle;
+                host.prefChanged(Prefs.SLIDE_ORDER, prefs.slideShuffle ? "shuffle" : "order");
+                break;
             case R_LAYOUT:
                 prefs.layout = cycle(prefs.layout, 3);
                 host.prefChanged(Prefs.LAYOUT, prefs.layout == 2 ? "icons" : prefs.layout == 1 ? "list" : "dock");
@@ -2063,6 +2163,10 @@ final class Stage extends View {
     }
 
     private void menu() {
+        if (mode == WALLS) {
+            toggleSlide(Walls.id(wallI));
+            return;
+        }
         if (mode == HOME && !inCtl && !dock.isEmpty()) {
             RectF anchor;
             if (prefs.layout != 0) {
@@ -2144,6 +2248,9 @@ final class Stage extends View {
                     "Lavender uses a colour field instead of a photo. Pick another colour scheme for photos."));
             return;
         }
+        wallCount = Walls.count(getContext());
+        thumbCards[Walls.CUSTOM] = null;
+        thumbsLoading = false;
         wallsFrom = from;
         mode = WALLS;
         wallBefore = wall;
@@ -2157,6 +2264,17 @@ final class Stage extends View {
         mode = wallsFrom;
         first = 0;
         placeDock(false);
+    }
+
+/** Puts a photo into the slideshow or takes it out again, and says which. */
+    private void toggleSlide(String id) {
+        boolean in = prefs.slides.remove(id);
+        if (!in) prefs.slides.add(id);
+        host.prefChanged(Prefs.SLIDES, TextUtils.join(",", prefs.slides));
+        int n = prefs.slides.size();
+        say(in ? t("Aus der Diashow genommen", "Taken out of the slideshow")
+                : t("In der Diashow · " + n + (n == 1 ? " Bild" : " Bilder"), "In the slideshow · " + n + (n == 1 ? " photo" : " photos")));
+        invalidate();
     }
 
     private void cancelWalls() {

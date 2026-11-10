@@ -265,6 +265,27 @@ async function debloatPanel() {
   }));
 }
 
+/**
+ * A picked photo as the TV wants it: cropped to 16:9 from the middle (like the launcher's own
+ * photos), scaled to 1920 x 1080, JPEG; plus a small preview for the panel.
+ */
+async function tvPhoto(f: File): Promise<{ jpeg: Uint8Array; thumb: string }> {
+  const bmp = await createImageBitmap(f);
+  const draw = (w: number, h: number) => {
+    const c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    const s = Math.max(w / bmp.width, h / bmp.height), sw = w / s, sh = h / s;
+    c.getContext('2d')!.drawImage(bmp, (bmp.width - sw) / 2, (bmp.height - sh) / 2, sw, sh, 0, 0, w, h);
+    return c;
+  };
+  const big = draw(1920, 1080);
+  const blob = await new Promise<Blob>((ok, no) => big.toBlob((b) => (b ? ok(b) : no(new Error('encode'))), 'image/jpeg', .9));
+  const thumb = draw(240, 135).toDataURL('image/jpeg', .85);
+  bmp.close();
+  return { jpeg: new Uint8Array(await blob.arrayBuffer()), thumb };
+}
+
 function uiPanel() {
   const o: UiOptions = { layout: state?.layout ?? 'dock', tiles: state?.tiles ?? 'original', theme: state?.theme ?? 'neutral' };
   const thumbs: Record<UiOptions['layout'], string> = {
@@ -283,6 +304,14 @@ function uiPanel() {
       <div class="swatches">${THEMES.map((k) =>
         `<button class="choice swatch ${k === o.theme ? 'on' : ''}" data-theme="${k}"><div class="thumb sw-${k}"><i class="g"></i><i class="f"></i></div><span>${t.themeName[k]}</span></button>`).join('')}</div>
       <p class="note">${t.coloursNote}</p>
+      <div class="label">${t.wallpaper}</div>
+      <div class="photo-pick">
+        <button class="photo-prev" id="photoPrev" data-act="pick-photo" aria-label="${t.choosePhoto}" title="${t.choosePhoto}">
+          <span class="photo-img"></span><span class="photo-hover">${icon.upload(22)}</span>
+        </button>
+        <p class="photo-status" id="photoStatus">${t.photoNote}</p>
+        <input type="file" id="photoFile" accept="image/jpeg,image/png,image/webp" hidden>
+      </div>
       <div class="label">${t.tiles}</div>
       ${option('tiles', t.look, tilesLabel())}
     </div>
@@ -295,6 +324,37 @@ function uiPanel() {
     o.theme = b.dataset.theme as Theme;
     panel.querySelectorAll('[data-theme]').forEach((x) => x.classList.toggle('on', x === b));
   }));
+  const file = panel.querySelector<HTMLInputElement>('#photoFile')!;
+  panel.querySelector('[data-act=pick-photo]')!.addEventListener('click', () => file.click());
+  file.addEventListener('change', async () => {
+    const f = file.files?.[0];
+    file.value = '';
+    if (!f) return;
+    const status = panel.querySelector('#photoStatus')!;
+    const prev = panel.querySelector<HTMLElement>('#photoPrev')!;
+    status.classList.remove('bad');
+    let photo: { jpeg: Uint8Array; thumb: string };
+    try {
+      photo = await tvPhoto(f);
+    } catch {
+      status.textContent = t.photoUnreadable;
+      status.classList.add('bad');
+      return;
+    }
+    prev.querySelector('.photo-img')!.innerHTML = `<img src="${photo.thumb}" alt="">`;
+    prev.classList.add('has');
+    // Auto takes its colour from this photo; Lavender would hide it behind its colour field.
+    o.theme = 'auto';
+    panel.querySelectorAll<HTMLElement>('[data-theme]').forEach((x) => x.classList.toggle('on', x.dataset.theme === 'auto'));
+    status.textContent = t.sendingPhoto;
+    try {
+      await api.setWallpaper(photo.jpeg, o.theme);
+      status.textContent = t.photoSent;
+    } catch (e) {
+      status.textContent = tr(String(e));
+      status.classList.add('bad');
+    }
+  });
   panel.querySelector('[data-opt=tiles]')!.addEventListener('click', (e) => {
     o.tiles = o.tiles === 'original' ? 'glass' : 'original';
     (e.currentTarget as HTMLElement).querySelector('.value')!.textContent = tilesLabel();

@@ -222,3 +222,43 @@ fn futurity(adb: &Adb, sdk: u32, on: bool) {
         adb.sh("settings delete global dumbtv_min_futurity");
     }
 }
+
+/// The largest photo the window may send; it scales photos to 1920 x 1080 JPEG first, so a
+/// real upload is a few hundred kilobytes.
+const MAX_PHOTO: usize = 12 * 1024 * 1024;
+
+/// Sends the owner's photo to the TV as its wallpaper, with a colour scheme. The photo goes into
+/// the launcher's media folder (the one folder adb can write on every Fire OS), and a settings
+/// file next to it switches to it; the launcher picks both up when HOME comes back to the
+/// front. Nothing restarts, so the HOME guard stays bound.
+pub fn send_wallpaper(adb: &Adb, jpeg: &[u8], theme: &str) -> Result<(), String> {
+    if jpeg.len() < 1024 || jpeg.len() > MAX_PHOTO || !jpeg.starts_with(&[0xFF, 0xD8]) {
+        return Err("That photo could not be read. Pick a JPEG, PNG or WebP picture.".into());
+    }
+    if !device::installed(adb).contains(GLASS) {
+        return Err("Glass Home is not on this Fire TV yet. Install Glass UI first.".into());
+    }
+    let media = format!("/sdcard/Android/media/{GLASS}");
+    adb.sh(&format!("mkdir -p {media}/wallpapers"));
+    let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0);
+    let dir = std::env::temp_dir();
+    let photo = dir.join(format!("glasshome-wall-{}.jpg", std::process::id()));
+    std::fs::write(&photo, jpeg).map_err(|e| e.to_string())?;
+    let sent = adb.push(&photo, &format!("{media}/wallpapers/glass-home.jpg"));
+    let _ = std::fs::remove_file(&photo);
+    sent?;
+    // Applied once by the launcher; the stamp makes a second upload count as new, so the own
+    // photo is chosen again even if the wallpaper was changed on the TV since.
+    let mut conf = format!("glass.wall=custom\nglass.wall.sent={stamp}\n");
+    if THEMES.contains(&theme) {
+        conf.push_str(&format!("glass.theme={theme}\n"));
+    }
+    let settings = dir.join(format!("glasshome-import-{}.conf", std::process::id()));
+    std::fs::write(&settings, conf).map_err(|e| e.to_string())?;
+    let pushed = adb.push(&settings, &format!("{media}/home.conf"));
+    let _ = std::fs::remove_file(&settings);
+    pushed?;
+    // Glass Home itself, not the HOME action: on Fire TV that resolves to Amazon's launcher.
+    adb.sh(&format!("am start -n {GLASS}/.Home"));
+    Ok(())
+}
