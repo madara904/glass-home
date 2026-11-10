@@ -57,8 +57,6 @@ The programs are not signed yet, so the first start shows a warning:
    device name seven times to become a developer. Then My Fire TV › Developer options ›
    ADB debugging: on.
 
-   <img src="docs/img/firetv-my-fire-tv.webp" width="480" alt="The Fire TV menu My Fire TV with About and Developer options">
-
 2. **Open Glass Home on a computer in the same Wi-Fi.** It finds the Fire TV by itself. If it
    doesn't, type the TV's address (Settings › My Fire TV › About › Network).
 3. **Confirm on the TV.** The first time, the TV asks "Allow USB debugging?". Tick "Always allow
@@ -68,16 +66,6 @@ Then choose **Debloat**, wait for the TV's restart, and choose **Glass UI**. The
 [step-by-step guide](https://madara904.github.io/glass-home/) walks through every screen with
 pictures; it is also in [`docs/`](docs/index.html).
 
-<table>
-  <tr>
-    <td width="50%"><img src="docs/img/tool-2-connect.webp" alt="Glass Home lists the Fire TVs it found on the network, with Google TV devices greyed out"><br><sub>It finds the Fire TV on the network by itself.</sub></td>
-    <td width="50%"><img src="docs/img/tool-4-debloat.webp" alt="The Debloat panel: Prime Video, Alexa and Fire OS updates kept, the DNS filter on"><br><sub>Debloat: you choose what stays.</sub></td>
-  </tr>
-  <tr>
-    <td width="50%"><img src="docs/img/tool-5-debloat-done.webp" alt="Every debloat step ticked"><br><sub>Every step is checked afterwards.</sub></td>
-    <td width="50%"><img src="docs/img/tool-6-glass-ui.webp" alt="The Glass UI panel with the layouts Dock, List and Icons"><br><sub>Glass UI: pick a layout, install.</sub></td>
-  </tr>
-</table>
 
 ## What it does
 
