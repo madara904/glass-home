@@ -1,0 +1,7 @@
+launcher/build/
+launcher/release.keystore
+backup/
+out/
+
+# Vite cache from previewing docs/ locally
+docs/.vite/

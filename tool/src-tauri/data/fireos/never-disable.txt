@@ -1,0 +1,58 @@
+# Packages that must never be disabled or uninstalled, whatever else looks
+# tempting. debloat.sh refuses to touch anything listed here. Each line is
+# either the thing that draws the screen, switches inputs, keeps the remote
+# paired, or is needed after a factory reset.
+com.amazon.tv.launcher                 # the home screen itself
+com.amazon.firehomestarter             # starts the home screen at boot
+com.amazon.tv.settings.v2              # settings app
+com.amazon.tv.settings.core
+com.amazon.tv.inputpreference.service  # HDMI / input switching
+com.amazon.tv.routing
+com.amazon.tv.devicecontrol            # CEC, remote-driven device control
+com.amazon.tv.devicecontrolsettings
+com.amazon.tv.keypolicymanager         # remote keys
+com.amazon.tv.livetv                   # tuner
+com.amazon.franktvinput                # TV input service
+com.amazon.tifobserver
+com.mediatek.tis                       # MediaTek HDMI and analog inputs (Fire TV Edition TVs)
+com.mediatek.dtv.tvinput.atsctuner
+com.amazon.mediatek.livetv
+com.amazon.tv.settings.mediatek
+com.droidlogic                         # Amlogic HDMI and tuner (Fire TV Edition TVs on droidlogic,
+com.droidlogic.tvinput                 # e.g. Amazon 4-Series AFTNA67200): system service,
+com.droidlogic.providers.tv            # HDMI 1-4 and ADTVInputService (tuner), channel database
+com.amazon.tv.settings.amlogic         # picture and panel settings (Amlogic)
+com.amazon.tv.pqsettings
+com.vewd.core.fvpplayer                # HbbTV engine (red button, broadcaster media libraries)
+com.vewd.core.opapp
+com.vewd.core.service
+com.vewd.core.tis                      # HbbTV inputs for cable, terrestrial and satellite
+com.vewd.core.tvapp
+com.amazon.tv.conditionalaccess        # CI+ module
+com.amazon.tv.channelscan              # channel scan
+com.amazon.tv.arc                      # HDMI ARC / eARC
+com.amazon.android.tv.scan             # channel scan service
+uk.co.freeview.signaidl                # Freeview Play signing (UK/EU builds)
+com.android.networkstack.tethering.droidlogic          # Amlogic network stack
+com.android.networkstack.tethering.inprocess.droidlogic
+com.amazon.fireinputdevices            # input devices / remote
+com.amazon.autopairservice             # remote pairing
+com.amazon.device.bluetoothpa
+com.amazon.device.blepa
+com.amazon.whisperjoin.middleware.np   # device setup / pairing
+com.amazon.whisperplay.service.install
+com.amazon.storm.lightning.tutorial    # despite the name, holds the PIN screen the Fire TV phone
+                                       # app needs to pair (JpakePinActivity, started by turnstile)
+com.amazon.tv.oobe                     # first-run setup, needed after a factory reset
+com.amazon.tv.ooberesource
+com.amazon.webview.chromium            # webview, many apps break without it
+com.amazon.venezia                     # app store
+com.amazon.firebat                     # Prime Video (Fire OS 6 and 7), not an OTA helper
+com.amazon.device.messaging            # disabling it hung a 2025 Fire TV at the boot animation
+                                       # (issue #57). Prime Video needs it to start.
+com.amazon.vizzini                     # do not disable: it is a persistent priv-app that
+                                       # then draws an undismissable "Unable to Detect Your
+                                       # Remote" window over the TV. Block its domains instead.
+com.android.systemui
+com.android.packageinstaller
+com.android.permissioncontroller

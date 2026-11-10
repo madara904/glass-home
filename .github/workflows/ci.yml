@@ -1,0 +1,54 @@
+# Checks every pull request and every push to main. Read-only and without secrets, so it is safe
+# for pull requests from forks. It never builds or publishes a release: that is build.yml,
+# started by hand or by a v* tag.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: tool
+
+jobs:
+  check:
+    name: Check (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+        with:
+          version: 12.6.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: tool/pnpm-lock.yaml
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@8cbdedb5103daa674dcf46d3590fe06a76645684 # v2.8.0
+        with:
+          workspaces: tool/src-tauri
+      - run: pnpm install --frozen-lockfile
+      # Type check and the frontend build; the Rust side embeds dist/, so this comes first.
+      - run: pnpm build
+      - name: Test
+        working-directory: tool/src-tauri
+        run: cargo test
+      - name: Clippy
+        working-directory: tool/src-tauri
+        run: cargo clippy --all-targets -- -D warnings

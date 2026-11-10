@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glass Home</title>
+<meta name="description" content="Debloat your Amazon Fire TV and give it a calm glass home screen, from your PC or Mac. A step-by-step guide.">
+<link rel="icon" href="assets/mark.svg" type="image/svg+xml">
+<style>
+  @font-face { font-family: Roboto; src: url(assets/roboto.ttf); font-weight: 100 900; font-display: swap; }
+
+  :root {
+    --ink: #1b2233;
+    --mute: rgba(27, 34, 51, .68);
+    --faint: rgba(27, 34, 51, .48);
+    --solid: #1b2233;
+    --solid-ink: #f7f8fc;
+    --glass: linear-gradient(170deg, rgba(255,255,255,.66), rgba(255,255,255,.40) 58%, rgba(255,255,255,.52));
+    --edge: inset 0 1px 0 rgba(255,255,255,.95), inset 0 0 0 1px rgba(255,255,255,.32);
+    --shadow: 0 30px 70px -38px rgba(58, 68, 128, .42);
+    --blur: blur(30px) saturate(160%);
+    --ease: cubic-bezier(.2, .7, .2, 1);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    min-height: 100vh;
+    background: #e6eaf6;
+    color: var(--ink);
+    font: 17px/1.55 Roboto, system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* The app icon's colours, moved around, as in the desktop tool. */
+  .sky {
+    position: fixed; inset: 0; z-index: -1;
+    background:
+      radial-gradient(48% 62% at 12% 18%, rgba(169, 159, 240, .55), transparent 72%),
+      radial-gradient(42% 55% at 46% 4%, rgba(127, 151, 230, .40), transparent 70%),
+      radial-gradient(50% 60% at 92% 88%, rgba(143, 216, 200, .62), transparent 72%),
+      radial-gradient(38% 48% at 70% 46%, rgba(95, 182, 201, .30), transparent 70%),
+      linear-gradient(315deg, #dff4ee, #e7ecf8 50%, #e4defa);
+  }
+  a { color: inherit; }
+  img { display: block; max-width: 100%; height: auto; }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+
+  /* ---------- top line ---------- */
+  .top { display: flex; align-items: center; gap: 10px; padding: 26px 0; }
+  .top .word { font-weight: 560; font-size: 16px; white-space: nowrap; }
+  .top .spacer { flex: 1; }
+  .quiet { display: inline-flex; align-items: center; gap: 7px; color: var(--mute); text-decoration: none; font-size: 15px; padding: 8px 6px; }
+  .quiet:hover { color: var(--ink); }
+
+  /* ---------- hero ---------- */
+  .hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 48px; align-items: center; padding: 40px 0 72px; }
+  h1 { font-size: clamp(40px, 6vw, 64px); line-height: 1.04; font-weight: 500; letter-spacing: -1.4px; }
+  .lead { margin-top: 18px; font-size: 19px; color: var(--mute); max-width: 460px; }
+  .buttons { margin-top: 30px; display: flex; flex-wrap: wrap; gap: 12px; }
+  .go {
+    display: inline-flex; align-items: center; gap: 9px; height: 52px; padding: 0 24px; border-radius: 26px;
+    background: var(--solid); color: var(--solid-ink); font-weight: 550; text-decoration: none;
+    box-shadow: 0 10px 24px -14px rgba(27, 34, 51, .6); transition: transform .18s var(--ease);
+  }
+  .go:hover { transform: scale(1.03); }
+  .go.light { background: var(--glass); color: var(--ink); backdrop-filter: var(--blur); box-shadow: var(--edge), var(--shadow); }
+  .note { margin-top: 14px; font-size: 14px; color: var(--faint); }
+  .shot { border-radius: 18px; box-shadow: 0 40px 90px -40px rgba(58, 68, 128, .55), 0 0 0 1px rgba(255,255,255,.6); }
+
+  /* ---------- sections ---------- */
+  section { padding: 56px 0; }
+  h2 { font-size: 34px; font-weight: 500; letter-spacing: -.6px; }
+  .sub { margin-top: 10px; color: var(--mute); max-width: 640px; }
+  .glass { background: var(--glass); backdrop-filter: var(--blur); box-shadow: var(--edge), var(--shadow); border-radius: 28px; }
+
+  /* ---------- steps ---------- */
+  .steps { margin-top: 32px; display: grid; gap: 22px; counter-reset: step; }
+  .step { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr); gap: 36px; align-items: center; padding: 28px; }
+  .step.text-only { grid-template-columns: 1fr; }
+  .step h3 { font-size: 22px; font-weight: 550; letter-spacing: -.2px; display: flex; gap: 12px; align-items: baseline; }
+  .step h3::before { counter-increment: step; content: counter(step); color: var(--faint); font-weight: 500; font-variant-numeric: tabular-nums; }
+  .step p { margin-top: 10px; color: var(--mute); }
+  .step p b { color: var(--ink); font-weight: 550; }
+  .path { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 15px; }
+  .path span { padding: 5px 12px; border-radius: 14px; background: rgba(255,255,255,.72); box-shadow: inset 0 1px 0 #fff; }
+  .path i { font-style: normal; color: var(--faint); }
+  .step .shot { border-radius: 14px; }
+
+  /* ---------- small cards ---------- */
+  .cards { margin-top: 28px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+  .card { padding: 24px; }
+  .card h3 { font-size: 18px; font-weight: 550; }
+  .card p { margin-top: 8px; color: var(--mute); font-size: 15.5px; }
+
+  details { padding: 20px 24px; }
+  details + details { margin-top: 12px; }
+  summary { cursor: pointer; font-weight: 550; list-style: none; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; float: right; color: var(--faint); font-weight: 400; }
+  details[open] summary::after { content: "–"; }
+  details p { margin-top: 10px; color: var(--mute); }
+
+  footer { padding: 40px 0 56px; color: var(--faint); font-size: 14px; display: flex; flex-wrap: wrap; gap: 6px 18px; }
+  footer a { text-decoration: none; }
+  footer a:hover { color: var(--ink); }
+
+  @media (max-width: 860px) {
+    .hero, .step { grid-template-columns: 1fr; gap: 24px; }
+    .cards { grid-template-columns: 1fr; }
+    .step { padding: 20px; }
+  }
+  @media (max-width: 520px) {
+    .top .quiet.section { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .go { transition: none; } }
+</style>
+</head>
+<body>
+<div class="sky"></div>
+<div class="wrap">
+
+  <header class="top">
+    <img src="assets/mark.svg" width="24" height="20" alt="">
+    <span class="word">Glass Home</span>
+    <span class="spacer"></span>
+    <a class="quiet section" href="#guide">Guide</a>
+    <a class="quiet section" href="#faq">Questions</a>
+    <a class="quiet" href="https://github.com/madara904/glass-home">GitHub</a>
+  </header>
+
+  <main>
+    <div class="hero">
+      <div>
+        <h1>A calm Fire TV, without the ads.</h1>
+        <p class="lead">Glass Home turns off Amazon's ads and tracking on your Fire TV and gives it a clean
+          glass home screen. You do it once, from your PC or Mac. No root, and everything can be undone.</p>
+        <div class="buttons">
+          <a class="go" href="https://github.com/madara904/glass-home/releases/latest">Download for Windows</a>
+          <a class="go light" href="https://github.com/madara904/glass-home/releases/latest">Download for Mac</a>
+        </div>
+        <p class="note">Free and open source. Works with Fire TV Sticks, Cubes and Fire TV televisions on Fire OS 6, 7 and 8.</p>
+      </div>
+      <img class="shot" src="img/tool-3-device.webp" width="1180" height="760"
+        alt="The Glass Home window with a connected Fire TV Stick Lite and the three actions Debloat, Glass UI and Restore">
+    </div>
+
+    <section id="guide">
+      <h2>Step by step</h2>
+      <p class="sub">About ten minutes, most of it waiting for the TV to restart. You need the Fire TV remote
+        and a computer in the same Wi-Fi.</p>
+
+      <h3 style="margin-top:40px;font-size:15px;letter-spacing:.9px;text-transform:uppercase;color:var(--faint);font-weight:550">On the TV, once</h3>
+      <div class="steps">
+        <div class="step glass">
+          <div>
+            <h3>Open "About"</h3>
+            <p>On the Fire TV remote, press the <b>Home</b> button, go to the gear icon on the right
+              and open these menus:</p>
+            <div class="path"><span>Settings</span><i>›</i><span>My Fire TV</span><i>›</i><span>About</span></div>
+            <p>"Developer options", right below About, is where you go in step 3.</p>
+          </div>
+          <img class="shot" src="img/firetv-my-fire-tv.webp" width="1280" height="720" loading="lazy"
+            alt="The Fire TV menu My Fire TV, with About highlighted and Developer options below it">
+        </div>
+        <div class="step glass text-only">
+          <div>
+            <h3>Become a developer</h3>
+            <p>The first line on that screen is the name of your Fire TV. Highlight it and press the
+              <b>middle button</b> of the remote <b>seven times</b>. The TV says "You are now a developer".</p>
+          </div>
+        </div>
+        <div class="step glass text-only">
+          <div>
+            <h3>Turn on ADB debugging</h3>
+            <p>Press <b>Back</b> once. A new entry has appeared. Open it and switch <b>ADB debugging</b> on.
+              The TV asks once whether you are sure: choose <b>OK</b>.</p>
+            <div class="path"><span>My Fire TV</span><i>›</i><span>Developer options</span><i>›</i><span>ADB debugging: On</span></div>
+          </div>
+        </div>
+      </div>
+
+      <h3 style="margin-top:48px;font-size:15px;letter-spacing:.9px;text-transform:uppercase;color:var(--faint);font-weight:550">On the computer</h3>
+      <div class="steps">
+        <div class="step glass">
+          <div>
+            <h3>Open Glass Home</h3>
+            <p>Download it for Windows or Mac and open it. There is nothing to install.</p>
+            <p><b>Windows</b> may say "Windows protected your PC": choose <b>More info</b>, then <b>Run anyway</b>.
+              <b>Mac</b> may refuse the first time: open System Settings › Privacy &amp; Security and choose
+              <b>Open Anyway</b>.</p>
+          </div>
+          <img class="shot" src="img/tool-1-intro.webp" width="1180" height="760" loading="lazy"
+            alt="Glass Home's first screen with the four things to do on the TV">
+        </div>
+        <div class="step glass">
+          <div>
+            <h3>Pick your Fire TV</h3>
+            <p>Glass Home looks for your Fire TV on the network by itself and lists it with its name.
+              Click it. If it is not in the list, type its address: it is on the TV under
+              Settings › My Fire TV › About › Network.</p>
+          </div>
+          <img class="shot" src="img/tool-2-connect.webp" width="1180" height="760" loading="lazy"
+            alt="The connect screen listing a Fire TV, a Fire TV Cube with ADB still off, and a Google TV marked as not supported">
+        </div>
+        <div class="step glass">
+          <div>
+            <h3>Allow it on the TV</h3>
+            <p>The first time, the TV asks <b>"Allow USB debugging?"</b>. Tick <b>Always allow from this
+              computer</b> and choose <b>OK</b>. Glass Home then shows your Fire TV.</p>
+          </div>
+          <img class="shot" src="img/tool-3-device.webp" width="1180" height="760" loading="lazy"
+            alt="The connected Fire TV with Debloat not applied and Glass UI not installed">
+        </div>
+        <div class="step glass">
+          <div>
+            <h3>Debloat</h3>
+            <p>Click <b>Debloat</b>. Choose what stays: Prime Video, Alexa and Fire OS updates are kept unless
+              you switch them off. Your own apps stay too, unless you mark them for removal. Click <b>Start</b>.</p>
+          </div>
+          <img class="shot" src="img/tool-4-debloat.webp" width="1180" height="760" loading="lazy"
+            alt="The Debloat panel with Prime Video, Alexa and Fire OS updates kept and the DNS filter on">
+        </div>
+        <div class="step glass">
+          <div>
+            <h3>Wait for the restart</h3>
+            <p>The TV restarts once on its own. Don't turn it off. When every step has a tick, click <b>Done</b>.</p>
+          </div>
+          <img class="shot" src="img/tool-5-debloat-done.webp" width="1180" height="760" loading="lazy"
+            alt="All debloat steps ticked, with Done and checked">
+        </div>
+        <div class="step glass">
+          <div>
+            <h3>Install the glass home screen</h3>
+            <p>Click <b>Glass UI</b>, pick a layout and click <b>Install</b>. From now on the Home button on
+              the remote opens Glass Home. Wallpaper, layout and everything else you change on the TV,
+              under Settings in Glass Home.</p>
+          </div>
+          <img class="shot" src="img/tool-6-glass-ui.webp" width="1180" height="760" loading="lazy"
+            alt="The Glass UI panel with the layouts Dock, List and Icons">
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Changed your mind?</h2>
+      <div class="step glass" style="margin-top:28px">
+        <div>
+          <p style="margin-top:0">Connect again and click <b>Restore</b>. Amazon's home screen comes back, every
+            package Glass Home turned off goes back on, the settings return to how they were, and the DNS filter
+            and Glass Home are removed. Apps you chose to remove don't come back by themselves; get them from the
+            Appstore again.</p>
+        </div>
+        <img class="shot" src="img/tool-7-restore.webp" width="1180" height="760" loading="lazy"
+          alt="The Restore panel listing what goes back to Amazon's state">
+      </div>
+    </section>
+
+    <section>
+      <h2>What it does</h2>
+      <div class="cards">
+        <div class="card glass"><h3>Debloat</h3><p>Turns off Amazon's ad, tracking and telemetry packages and sets
+          the privacy settings. Optionally a DNS filter that blocks Amazon's ad servers on the TV.</p></div>
+        <div class="card glass"><h3>Glass UI</h3><p>A quiet home screen made of glass: your apps, a wallpaper,
+          no ads and no rows of suggestions. The Home button opens it.</p></div>
+        <div class="card glass"><h3>Restore</h3><p>Puts everything back the way Amazon ships it. Nothing on the
+          TV's system is changed, so nothing is lost.</p></div>
+      </div>
+    </section>
+
+    <section id="faq">
+      <h2>Questions</h2>
+      <div style="margin-top:24px">
+        <details class="glass"><summary>Which Fire TVs work?</summary>
+          <p>Fire TV Sticks, Cubes and Fire TV televisions on Fire OS 6, 7 and 8. Fire TVs with Vega OS (sold since 2025)
+            don't allow it. Google TV and Android TV devices show up greyed out: Glass Home is built for Fire OS.</p></details>
+        <details class="glass"><summary>The TV never asks "Allow USB debugging?"</summary>
+          <p>The question appears on the TV screen. Make sure the TV is on and shows the Fire TV's picture, then
+            connect again from Glass Home.</p></details>
+        <details class="glass"><summary>Glass Home doesn't find my Fire TV.</summary>
+          <p>Check that ADB debugging is on and that the computer and the TV are in the same Wi-Fi (not a guest
+            network). On Windows, allow Glass Home through the firewall when asked. You can always type the TV's
+            address instead.</p></details>
+        <details class="glass"><summary>Is this safe?</summary>
+          <p>Glass Home only switches packages off and changes settings, the way the TV's own menus could. Nothing
+            on the system is deleted, and Restore undoes everything. It sends nothing anywhere: no accounts, no
+            tracking. The code is open on GitHub.</p></details>
+        <details class="glass"><summary>Will Fire OS updates undo it?</summary>
+          <p>Updates are kept by default so the TV stays secure. An update can turn a package back on; run Debloat
+            again and it is off again.</p></details>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span>Glass Home is open source under the MIT license.</span>
+    <a href="https://github.com/madara904/glass-home">github.com/madara904/glass-home</a>
+    <a href="https://github.com/madara904">madara904</a>
+    <a href="https://github.com/denniskribl">denniskribl</a>
+    <span>Not affiliated with Amazon. Amazon, Fire TV and Fire OS are trademarks of Amazon.com, Inc.</span>
+  </footer>
+</div>
+</body>
+</html>

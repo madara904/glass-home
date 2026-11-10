@@ -1,0 +1,59 @@
+name: Bug report
+description: Something on the TV or in the desktop tool doesn't work
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, what happened instead. The step list from the tool helps (screenshot or text).
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Fire TV model
+      description: Settings › My Fire TV › About, or the name the tool shows.
+      placeholder: "Fire TV Stick 4K (2nd gen)"
+    validations:
+      required: true
+  - type: input
+    id: fireos
+    attributes:
+      label: Fire OS version
+      placeholder: "Fire OS 7.7.0.1"
+    validations:
+      required: true
+  - type: input
+    id: tool
+    attributes:
+      label: Glass Home version
+      description: Of the desktop tool, from the release you downloaded.
+      placeholder: "v0.1.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Computer
+      options:
+        - Windows
+        - macOS
+        - Built from source
+    validations:
+      required: true
+  - type: dropdown
+    id: action
+    attributes:
+      label: Which part?
+      options:
+        - Finding or connecting to the TV
+        - Debloat
+        - Glass UI (the home screen)
+        - Restore
+        - Something else
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: Parental controls, other launchers or VPN apps on the TV, a guest network.

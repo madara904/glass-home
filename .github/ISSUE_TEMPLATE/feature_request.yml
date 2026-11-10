@@ -1,0 +1,14 @@
+name: Feature request
+description: An idea for the tool or the home screen
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like, and why?
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Your Fire TV model (if it matters)

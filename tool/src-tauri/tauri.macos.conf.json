@@ -1,0 +1,23 @@
+{
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Glass Home",
+        "width": 1180,
+        "height": 760,
+        "minWidth": 1020,
+        "minHeight": 660,
+        "center": true,
+        "hiddenTitle": true,
+        "titleBarStyle": "Overlay",
+        "trafficLightPosition": { "x": 24, "y": 36 }
+      }
+    ]
+  },
+  "bundle": {
+    "targets": ["app"],
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns"],
+    "macOS": { "minimumSystemVersion": "11.0" }
+  }
+}
