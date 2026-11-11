@@ -135,7 +135,7 @@ pub fn front(adb: &Adb) -> String {
 /// `dumpsys wifi`; Android 11 shows them in connectivity. The filter's own tunnel is skipped.
 pub fn dns_servers(adb: &Adb) -> Vec<String> {
     fn add(out: &mut Vec<String>, list: &str) {
-        for w in list.split(|c: char| c == ',' || c == ' ' || c == '/') {
+        for w in list.split([',', ' ', '/']) {
             if let Ok(ip) = w.trim().parse::<std::net::Ipv4Addr>() {
                 if !ip.is_loopback() && !ip.is_unspecified() && !out.contains(&ip.to_string()) {
                     out.push(ip.to_string());
