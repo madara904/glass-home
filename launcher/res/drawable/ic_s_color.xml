@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The colour scheme row: three overlapping circles, in the settings icons' line style. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="240dp" android:height="240dp" android:viewportWidth="24" android:viewportHeight="24">
+  <path android:pathData="M12 3.5a4.5 4.5 0 1 1 0 9a4.5 4.5 0 1 1 0 -9z" android:fillColor="#00000000" android:strokeColor="#FFFFFFFF"
+      android:strokeWidth="1.6" android:strokeLineCap="round" android:strokeLineJoin="round" />
+  <path android:pathData="M8 10.5a4.5 4.5 0 1 1 0 9a4.5 4.5 0 1 1 0 -9z" android:fillColor="#00000000" android:strokeColor="#FFFFFFFF"
+      android:strokeWidth="1.6" android:strokeLineCap="round" android:strokeLineJoin="round" />
+  <path android:pathData="M16 10.5a4.5 4.5 0 1 1 0 9a4.5 4.5 0 1 1 0 -9z" android:fillColor="#00000000" android:strokeColor="#FFFFFFFF"
+      android:strokeWidth="1.6" android:strokeLineCap="round" android:strokeLineJoin="round" />
+</vector>

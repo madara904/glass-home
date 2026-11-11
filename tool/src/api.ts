@@ -30,6 +30,7 @@ export interface DeviceState {
   glassVersion?: string;
   layout: 'dock' | 'list' | 'icons';
   tiles: 'original' | 'glass';
+  theme: Theme;
 }
 
 export interface App {
@@ -45,9 +46,14 @@ export interface DebloatOptions {
   remove: string[];
 }
 
+/** The launcher's colour schemes, as stored in glass.theme on the TV. */
+export type Theme = 'neutral' | 'auto' | 'mint' | 'sand' | 'lavender';
+export const THEMES: Theme[] = ['neutral', 'auto', 'mint', 'sand', 'lavender'];
+
 export interface UiOptions {
   layout: 'dock' | 'list' | 'icons';
   tiles: 'original' | 'glass';
+  theme: Theme;
 }
 
 export type StepState = 'pending' | 'running' | 'done' | 'failed' | 'skipped';
@@ -83,7 +89,7 @@ const mockDevice: Device = {
   serial: '192.168.1.20:5555', ip: '192.168.1.20', model: 'AFTSS',
   name: 'Fire TV Stick Lite', fireOs: 'Fire OS 7', sdk: 28, supported: true,
 };
-const mockState: DeviceState = { debloated: true, disabled: 34, dnsFilter: true, glassUi: true, glassVersion: '1.0', layout: 'icons', tiles: 'original' };
+const mockState: DeviceState = { debloated: true, disabled: 34, dnsFilter: true, glassUi: true, glassVersion: '1.0', layout: 'icons', tiles: 'original', theme: 'neutral' };
 const mockApps: App[] = [
   { pkg: 'com.ionitech.airscreen', label: 'AirScreen' },
   { pkg: 'com.disney.disneyplus', label: 'Disney+' },
@@ -115,6 +121,9 @@ export const api = {
     inTauri ? invoke('connect', { ip }) : wait(900).then(() => ({ ...mockDevice, ip, serial: ip + ':5555' })),
   state: (): Promise<DeviceState> => (inTauri ? invoke('device_state') : wait(300).then(() => mockState)),
   apps: (): Promise<App[]> => (inTauri ? invoke('user_apps') : wait(300).then(() => mockApps)),
+  /** The owner's photo (a 1920 x 1080 JPEG) as the TV's wallpaper, with a colour scheme. */
+  setWallpaper: (jpeg: Uint8Array, theme: Theme): Promise<void> =>
+    inTauri ? invoke<void>('set_wallpaper', { image: Array.from(jpeg), theme }) : wait(1200).then(() => undefined),
   disconnect: (): Promise<void> => (inTauri ? invoke('disconnect') : Promise.resolve()),
   debloat: (o: DebloatOptions, onStep: (s: Step) => void) =>
     inTauri ? runTask('run_debloat', { options: o }, onStep)
@@ -123,6 +132,8 @@ export const api = {
   installUi: (o: UiOptions, onStep: (s: Step) => void) =>
     inTauri ? runTask('run_install_ui', { options: o }, onStep)
       : mockRun(['Install Glass Home', 'Take over the home screen', 'Apply layout', 'Check'], onStep),
+  /** Turns ADB debugging off on the TV; the connection ends with it. */
+  adbOff: (): Promise<void> => (inTauri ? invoke<void>('adb_off') : wait(1500).then(() => undefined)),
   restore: (onStep: (s: Step) => void) =>
     inTauri ? runTask('run_restore', {}, onStep)
       : mockRun(["Bring back Amazon's home screen", 'Turn packages back on', 'Reset settings',

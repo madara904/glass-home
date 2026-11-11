@@ -11,6 +11,10 @@ fn main() {
         glass_home_lib::probe(&args[2]);
         return;
     }
+    if args.len() >= 4 && args[1] == "--wallpaper" {
+        let ok = glass_home_lib::wallpaper_cli(&args[2], &args[3], args.get(4).map(String::as_str).unwrap_or("auto"));
+        std::process::exit(if ok { 0 } else { 1 });
+    }
     if args.len() >= 4 && args[1] == "--run" {
         let ok = glass_home_lib::run_cli(&args[2], &args[3], args.get(4).map(String::as_str));
         std::process::exit(if ok { 0 } else { 1 });

@@ -1,8 +1,9 @@
 <h1 align="center">Glass Home</h1>
 
 <p align="center">
-  <b>Remove ads from your Fire TV Stick.</b> A one-click debloater and a clean glass home screen,<br>
-  from Windows or Mac. No root, no terminal, and everything can be undone.
+  <b>A glass home screen for your Fire TV, set up from Windows or Mac.</b><br>
+  Your colours, your own photos, a slideshow, and Amazon's ads turned off.<br>
+  A small Tauri app with adb built in. No root, no terminal, undo in one click.
 </p>
 
 <p align="center">
@@ -13,8 +14,16 @@
 </p>
 
 <p align="center">
-  <img src="docs/img/tool-3-device.webp" width="760" alt="The Glass Home window with a connected Fire TV Stick Lite and the actions Debloat, Glass UI and Restore">
+  <img src="docs/img/tv-neutral.webp" width="820" alt="Glass Home on a Fire TV: a mountain photo, the clock, and a glass dock with Netflix, Prime Video, Disney+ and Downloader">
 </p>
+
+<table>
+  <tr>
+    <td width="33%"><img src="docs/img/tv-auto.webp" alt="The Auto colour scheme: the glass takes its tint from the wallpaper"><br><sub><b>Auto</b>: the glass takes the photo's colour.</sub></td>
+    <td width="33%"><img src="docs/img/tv-lavender.webp" alt="The Lavender colour scheme: a soft colour field, light glass and dark text"><br><sub><b>Lavender</b>: light glass on a soft colour field.</sub></td>
+    <td width="33%"><img src="docs/img/tool-3-device.webp" alt="The Glass Home window on the computer with Debloat, Glass UI and Restore"><br><sub>The desktop tool that sets it all up.</sub></td>
+  </tr>
+</table>
 
 <p align="center">
   <a href="#download">Download</a> ·
@@ -36,6 +45,20 @@ Glass Home is two things:
   `app.glasshome.tv`.
 
 Nothing on the TV's system partition changes. **Restore** turns everything back to how it was.
+
+> **Yet another vibe-coded app.** Glass Home was built in conversation with an AI and tested on a
+> real Fire TV Stick, one stubborn evening at a time. It is a starting point, not a finished
+> product: read it, change it, make it yours.
+>
+> - The launcher is plain Java without libraries; almost all of it is one file you can read in an
+>   evening, [`Stage.java`](launcher/src/app/glasshome/tv/Stage.java).
+> - The desktop tool is a small Tauri app: Rust for the TV work ([`tool/src-tauri/src`](tool/src-tauri/src)),
+>   TypeScript for the window ([`tool/src`](tool/src)).
+> - Ideas waiting for someone: an ad-free screensaver with the slideshow, a quick menu on a long
+>   press of Home, the remote's app buttons opening apps of your choice, a kids mode, Android TV
+>   and Google TV support, an adb client written in Rust instead of the bundled one.
+>
+> Pull requests are welcome; so is a fork that goes its own way.
 
 ## Download
 
@@ -73,7 +96,9 @@ pictures; it is also in [`docs/`](docs/index.html).
 |---|---|
 | Debloat | disables Amazon's ad, tracking and telemetry packages, sets the privacy settings, limits the packages Amazon protects, optional DNS filter (personalDNSfilter, checksum-pinned) |
 | Glass UI | installs the launcher and gives it the HOME button (accessibility guard on Fire OS 7/8, keeper on Fire OS 6), carries over the settings of an earlier install |
+| Colours and photos | five colour schemes (Neutral, Auto from the wallpaper, Mint, Sand, Lavender), your own photo as the background, a slideshow with interval and order; set in the tool or on the TV |
 | Restore | turns everything back on, puts back the settings saved before the first debloat, removes the DNS filter and Glass Home, hands HOME back to Amazon |
+| Turn off ADB | when you are done: switches ADB debugging off on the TV, so nobody on your network can control it; Glass Home keeps working |
 
 ## Supported devices
 

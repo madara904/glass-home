@@ -1,4 +1,4 @@
-import { api, type App, type DebloatOptions, type Device, type Found, type DeviceState, type Step, type UiOptions } from './api';
+import { api, THEMES, type App, type DebloatOptions, type Device, type Found, type DeviceState, type Step, type UiOptions, type Theme } from './api';
 import { flag, icon, mark } from './icons';
 import { lang, setLang, t, tr, type Lang } from './i18n';
 import { AUTHORS, REPO, openDevtools, openGithub, windowAction, windowButtons } from './titlebar';
@@ -15,7 +15,8 @@ let open: string | null = null;
 let view: () => void = () => {};
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
-const lines = (s: string) => esc(s).replace(/\n/g, '<br>');
+// A space before each break, so a title still reads right where the stylesheet hides the break.
+const lines = (s: string) => esc(s).replace(/\n/g, ' <br>');
 
 const INTRO = 'glasshome.intro';
 const introSeen = () => { try { return localStorage.getItem(INTRO) === '1'; } catch { return false; } };
@@ -186,6 +187,7 @@ function deviceView() {
           <span class="value">${changed ? t.restoreValue : t.nothingToDo}</span>${icon.chevron(18)}</button>
       </div>
       <p class="foot">${t.foot}</p>
+      <button class="quiet danger" data-act="adb-off">${icon.shield(16)}${t.adbOff}</button>
     `);
 }
 
@@ -264,8 +266,29 @@ async function debloatPanel() {
   }));
 }
 
+/**
+ * A picked photo as the TV wants it: cropped to 16:9 from the middle (like the launcher's own
+ * photos), scaled to 1920 x 1080, JPEG; plus a small preview for the panel.
+ */
+async function tvPhoto(f: File): Promise<{ jpeg: Uint8Array; thumb: string }> {
+  const bmp = await createImageBitmap(f);
+  const draw = (w: number, h: number) => {
+    const c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    const s = Math.max(w / bmp.width, h / bmp.height), sw = w / s, sh = h / s;
+    c.getContext('2d')!.drawImage(bmp, (bmp.width - sw) / 2, (bmp.height - sh) / 2, sw, sh, 0, 0, w, h);
+    return c;
+  };
+  const big = draw(1920, 1080);
+  const blob = await new Promise<Blob>((ok, no) => big.toBlob((b) => (b ? ok(b) : no(new Error('encode'))), 'image/jpeg', .9));
+  const thumb = draw(240, 135).toDataURL('image/jpeg', .85);
+  bmp.close();
+  return { jpeg: new Uint8Array(await blob.arrayBuffer()), thumb };
+}
+
 function uiPanel() {
-  const o: UiOptions = { layout: state?.layout ?? 'dock', tiles: state?.tiles ?? 'original' };
+  const o: UiOptions = { layout: state?.layout ?? 'dock', tiles: state?.tiles ?? 'original', theme: state?.theme ?? 'neutral' };
   const thumbs: Record<UiOptions['layout'], string> = {
     dock: '<i class="g" style="left:14%;right:14%;bottom:9px;height:20px"></i><i style="left:20%;bottom:13px;width:14%;height:12px"></i><i style="left:37%;bottom:13px;width:14%;height:12px"></i><i style="left:54%;bottom:13px;width:14%;height:12px"></i>',
     list: '<i class="g" style="left:9px;top:10px;width:58%;height:15px"></i><i style="left:13px;top:13px;width:14px;height:9px"></i><i style="left:13px;top:31px;width:14px;height:9px;opacity:.6"></i><i style="left:13px;top:49px;width:14px;height:9px;opacity:.6"></i>',
@@ -278,6 +301,18 @@ function uiPanel() {
       <div class="label">${t.layout}</div>
       <div class="choices">${(Object.keys(thumbs) as UiOptions['layout'][]).map((k) =>
         `<button class="choice ${k === o.layout ? 'on' : ''}" data-layout="${k}"><div class="thumb">${thumbs[k]}</div><span>${t[k]}</span></button>`).join('')}</div>
+      <div class="label">${t.colours}</div>
+      <div class="swatches">${THEMES.map((k) =>
+        `<button class="choice swatch ${k === o.theme ? 'on' : ''}" data-theme="${k}"><div class="thumb sw-${k}"><i class="g"></i><i class="f"></i></div><span>${t.themeName[k]}</span></button>`).join('')}</div>
+      <p class="note">${t.coloursNote}</p>
+      <div class="label">${t.wallpaper}</div>
+      <div class="photo-pick">
+        <button class="photo-prev" id="photoPrev" data-act="pick-photo" aria-label="${t.choosePhoto}" title="${t.choosePhoto}">
+          <span class="photo-img"></span><span class="photo-hover">${icon.upload(22)}</span>
+        </button>
+        <p class="photo-status" id="photoStatus">${t.photoNote}</p>
+        <input type="file" id="photoFile" accept="image/jpeg,image/png,image/webp" hidden>
+      </div>
       <div class="label">${t.tiles}</div>
       ${option('tiles', t.look, tilesLabel())}
     </div>
@@ -286,11 +321,76 @@ function uiPanel() {
     o.layout = b.dataset.layout as UiOptions['layout'];
     panel.querySelectorAll('[data-layout]').forEach((x) => x.classList.toggle('on', x === b));
   }));
+  panel.querySelectorAll<HTMLElement>('[data-theme]').forEach((b) => b.addEventListener('click', () => {
+    o.theme = b.dataset.theme as Theme;
+    panel.querySelectorAll('[data-theme]').forEach((x) => x.classList.toggle('on', x === b));
+  }));
+  const file = panel.querySelector<HTMLInputElement>('#photoFile')!;
+  panel.querySelector('[data-act=pick-photo]')!.addEventListener('click', () => file.click());
+  file.addEventListener('change', async () => {
+    const f = file.files?.[0];
+    file.value = '';
+    if (!f) return;
+    const status = panel.querySelector('#photoStatus')!;
+    const prev = panel.querySelector<HTMLElement>('#photoPrev')!;
+    status.classList.remove('bad');
+    let photo: { jpeg: Uint8Array; thumb: string };
+    try {
+      photo = await tvPhoto(f);
+    } catch {
+      status.textContent = t.photoUnreadable;
+      status.classList.add('bad');
+      return;
+    }
+    prev.querySelector('.photo-img')!.innerHTML = `<img src="${photo.thumb}" alt="">`;
+    prev.classList.add('has');
+    // Auto takes its colour from this photo; Lavender would hide it behind its colour field.
+    o.theme = 'auto';
+    panel.querySelectorAll<HTMLElement>('[data-theme]').forEach((x) => x.classList.toggle('on', x.dataset.theme === 'auto'));
+    status.textContent = t.sendingPhoto;
+    try {
+      await api.setWallpaper(photo.jpeg, o.theme);
+      status.textContent = t.photoSent;
+    } catch (e) {
+      status.textContent = tr(String(e));
+      status.classList.add('bad');
+    }
+  });
   panel.querySelector('[data-opt=tiles]')!.addEventListener('click', (e) => {
     o.tiles = o.tiles === 'original' ? 'glass' : 'original';
     (e.currentTarget as HTMLElement).querySelector('.value')!.textContent = tilesLabel();
   });
   panel.querySelector('[data-act=go]')!.addEventListener('click', () => run(panel, t.glassUi, (s) => api.installUi(o, s)));
+}
+
+/** The danger button's dialog: what turning ADB off gives, what keeps working, how to undo it. */
+function adbOffPanel() {
+  const panel = showPanel('adb-off', `
+    <header><h2>${t.adbOffTitle}</h2><p>${t.adbOffSub}</p></header>
+    <div class="body">
+      <div class="step">${icon.check(16)}${t.adbOffKeeps}</div>
+      <div class="step warn">${icon.info(16)}${t.adbOffAfter}</div>
+      <p class="note">${t.adbOffBack}</p>
+      <p class="summary bad" id="adbErr"></p>
+    </div>
+    <footer><button class="quiet" data-act="close">${t.cancel}</button><button class="go danger" data-act="go">${t.adbOffGo}</button></footer>`);
+  const go = panel.querySelector<HTMLButtonElement>('[data-act=go]')!;
+  go.addEventListener('click', async () => {
+    go.disabled = true;
+    go.textContent = t.adbOffBusy;
+    try {
+      await api.adbOff();
+      device = null;
+      state = null;
+      open = null;
+      connectView(t.adbOffDone, false);
+      document.getElementById('err')?.classList.add('calm');
+    } catch (e) {
+      panel.querySelector('#adbErr')!.textContent = tr(String(e));
+      go.disabled = false;
+      go.textContent = t.adbOffGo;
+    }
+  });
 }
 
 function restorePanel() {
@@ -360,6 +460,7 @@ root.addEventListener('click', (e) => {
     case 'debloat': debloatPanel(); break;
     case 'ui': uiPanel(); break;
     case 'restore': restorePanel(); break;
+    case 'adb-off': adbOffPanel(); break;
     case 'close': closePanel(); break;
     case 'done': closePanel(); setTimeout(refresh, 320); break;
   }

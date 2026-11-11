@@ -37,6 +37,7 @@ pub struct State {
     pub glass_version: Option<String>,
     pub layout: String,
     pub tiles: String,
+    pub theme: String,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -210,6 +211,7 @@ pub fn state(adb: &Adb, sdk: u32) -> State {
         glass_version: pkg.and_then(|p| version(adb, p)).map(|v| if pkg == Some(LEGACY) { format!("{v} (alt)") } else { v }),
         layout: conf.get("glass.layout").cloned().unwrap_or_else(|| "dock".into()),
         tiles: if conf.get("glass.icons").map(String::as_str) == Some("glass") { "glass".into() } else { "original".into() },
+        theme: conf.get("glass.theme").filter(|t| crate::ui::THEMES.contains(&t.as_str())).cloned().unwrap_or_else(|| "neutral".into()),
     }
 }
 

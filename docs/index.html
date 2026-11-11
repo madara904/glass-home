@@ -57,10 +57,10 @@
   .sky {
     position: fixed; inset: 0; z-index: -1;
     background:
-      radial-gradient(48% 62% at 12% 18%, rgba(169, 159, 240, .55), transparent 72%),
-      radial-gradient(42% 55% at 46% 4%, rgba(127, 151, 230, .40), transparent 70%),
-      radial-gradient(50% 60% at 92% 88%, rgba(143, 216, 200, .62), transparent 72%),
-      radial-gradient(38% 48% at 70% 46%, rgba(95, 182, 201, .30), transparent 70%),
+      radial-gradient(48% 62% at 12% 18%, rgba(169, 159, 240, .30), transparent 72%),
+      radial-gradient(42% 55% at 46% 4%, rgba(127, 151, 230, .22), transparent 70%),
+      radial-gradient(50% 60% at 92% 88%, rgba(143, 216, 200, .34), transparent 72%),
+      radial-gradient(38% 48% at 70% 46%, rgba(95, 182, 201, .16), transparent 70%),
       linear-gradient(315deg, #dff4ee, #e7ecf8 50%, #e4defa);
   }
   a { color: inherit; }
@@ -115,6 +115,11 @@
   .card h3 { font-size: 18px; font-weight: 550; }
   .card p { margin-top: 8px; color: var(--mute); font-size: 15.5px; }
 
+  .pair { margin-top: 28px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+  .pair .shot { border-radius: 14px; }
+  figcaption { margin-top: 12px; color: var(--mute); font-size: 15.5px; }
+  figcaption b { color: var(--ink); font-weight: 550; }
+
   details { padding: 20px 24px; }
   details + details { margin-top: 12px; }
   summary { cursor: pointer; font-weight: 550; list-style: none; }
@@ -129,7 +134,7 @@
 
   @media (max-width: 860px) {
     .hero, .step { grid-template-columns: 1fr; gap: 24px; }
-    .cards { grid-template-columns: 1fr; }
+    .cards, .pair { grid-template-columns: 1fr; }
     .step { padding: 20px; }
   }
   @media (max-width: 520px) {
@@ -146,6 +151,7 @@
     <img src="assets/mark.svg" width="24" height="20" alt="">
     <span class="word">Glass Home</span>
     <span class="spacer"></span>
+    <a class="quiet section" href="#look">Look</a>
     <a class="quiet section" href="#guide">Guide</a>
     <a class="quiet section" href="#faq">Questions</a>
     <a class="quiet" href="https://github.com/madara904/glass-home">GitHub</a>
@@ -156,16 +162,30 @@
       <div>
         <h1>Remove ads from your Fire TV.</h1>
         <p class="lead">Glass Home turns off Amazon's ads and tracking on your Fire TV and gives it a clean
-          glass home screen. You do it once, from your PC or Mac. No root, and everything can be undone.</p>
+          glass home screen in your colours, with your own photos. You do it once, from your PC or Mac.
+          No root, and everything can be undone.</p>
         <div class="buttons">
           <a class="go" href="https://github.com/madara904/glass-home/releases/latest">Download for Windows</a>
           <a class="go light" href="https://github.com/madara904/glass-home/releases/latest">Download for Mac</a>
         </div>
         <p class="note">Free and open source. Works with Fire TV Sticks, Cubes and Fire TV televisions on Fire OS 6, 7 and 8.</p>
       </div>
-      <img class="shot" src="img/tool-3-device.webp" width="1180" height="760"
-        alt="The Glass Home window with a connected Fire TV Stick Lite and the three actions Debloat, Glass UI and Restore">
+      <img class="shot" src="img/tv-neutral.webp" width="1280" height="720"
+        alt="Glass Home on a Fire TV: a mountain photo, the clock, and a glass dock with Netflix, Prime Video, Disney+ and Downloader">
     </div>
+
+    <section id="look">
+      <h2>Your colours, your photos</h2>
+      <p class="sub">Five colour schemes: Neutral, Mint, Sand, Lavender, and Auto, where the glass takes its colour
+        from the wallpaper. Use one of the built-in photos, send your own from the computer, or let a slideshow
+        change them every few minutes. Choose in the desktop tool or on the TV, under Settings › Background.</p>
+      <div class="pair">
+        <figure><img class="shot" src="img/tv-auto.webp" width="1280" height="720" loading="lazy"
+          alt="The Auto colour scheme: the glass is tinted with the wallpaper's colour"><figcaption><b>Auto</b>: the glass follows the photo.</figcaption></figure>
+        <figure><img class="shot" src="img/tv-lavender.webp" width="1280" height="720" loading="lazy"
+          alt="The Lavender colour scheme: a soft colour field with light glass and dark text"><figcaption><b>Lavender</b>: light glass on a soft colour field.</figcaption></figure>
+      </div>
+    </section>
 
     <section id="guide">
       <h2>Step by step</h2>
@@ -249,8 +269,17 @@
           <div>
             <h3>Install the glass home screen</h3>
             <p>Click <b>Glass UI</b>, pick a layout and click <b>Install</b>. From now on the Home button on
-              the remote opens Glass Home. Wallpaper, layout and everything else you change on the TV,
-              under Settings in Glass Home.</p>
+              the remote opens Glass Home. Colours, wallpaper, layout and everything else you change on
+              the TV, under Settings in Glass Home.</p>
+          </div>
+        </div>
+        <div class="step glass text-only">
+          <div>
+            <h3>Turn off ADB debugging</h3>
+            <p>When you are done, click <b>Turn off ADB debugging</b> under the actions. Nobody on your network
+              can control the TV over ADB after that, and Glass Home keeps working. To restore or update later,
+              switch it back on at the TV:</p>
+            <div class="path"><span>My Fire TV</span><i>›</i><span>Developer options</span><i>›</i><span>ADB debugging: On</span></div>
           </div>
         </div>
       </div>
@@ -273,10 +302,26 @@
       <div class="cards">
         <div class="card glass"><h3>Debloat</h3><p>Turns off Amazon's ad, tracking and telemetry packages and sets
           the privacy settings. Optionally a DNS filter that blocks Amazon's ad servers on the TV.</p></div>
-        <div class="card glass"><h3>Glass UI</h3><p>A quiet home screen made of glass: your apps, a wallpaper,
-          no ads and no rows of suggestions. The Home button opens it.</p></div>
+        <div class="card glass"><h3>Glass UI</h3><p>A quiet home screen made of glass: your apps, your colours,
+          your photos, no ads and no rows of suggestions. The Home button opens it.</p></div>
         <div class="card glass"><h3>Restore</h3><p>Puts everything back the way Amazon ships it. Nothing on the
           TV's system is changed, so nothing is lost.</p></div>
+      </div>
+    </section>
+
+    <section id="tinker">
+      <h2>Make it yours</h2>
+      <div class="step glass text-only" style="margin-top:28px">
+        <div>
+          <p style="margin-top:0"><b>Yet another vibe-coded app.</b> Glass Home was built in conversation with an AI
+            and tested on a real Fire TV Stick, one stubborn evening at a time. It is a starting point, not a
+            finished product: read it, change it, fork it.</p>
+          <p>The launcher is plain Java without libraries, almost all of it in one file. The desktop tool is a small
+            Tauri app, Rust for the TV work and TypeScript for the window. Ideas waiting for someone: an ad-free
+            screensaver, a quick menu on a long press of Home, the remote's app buttons opening apps of your choice,
+            a kids mode, Android TV support.</p>
+          <div class="buttons"><a class="go light" href="https://github.com/madara904/glass-home">Read the code on GitHub</a></div>
+        </div>
       </div>
     </section>
 
