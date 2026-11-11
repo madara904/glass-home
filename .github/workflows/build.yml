@@ -1,5 +1,6 @@
 # Builds the desktop tool as programs that run without installing: one Glass Home.exe for
-# Windows, Glass Home.app (Apple Silicon and Intel in one) for macOS. The TV app is built into
+# Windows, Glass Home.app (Apple Silicon and Intel in one) for macOS, Glass-Home-Android.apk for
+# phones (needs the ANDROID_KEYSTORE and ANDROID_KEYSTORE_PASSWORD secrets). The TV app is built into
 # the program; adb is spoken by the program itself. Every run publishes both files as a GitHub release: started
 # by hand, it tags the commit v<version> from tool/src-tauri/tauri.conf.json itself (a new
 # version there means a new release; the same version again replaces that release's files);
@@ -74,8 +75,47 @@ jobs:
           path: tool/Glass-Home-macOS.zip
           if-no-files-found: error
 
+  # The phone app, signed with the release key from the ANDROID_KEYSTORE secrets.
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+        with:
+          version: 12.6.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: tool/pnpm-lock.yaml
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi
+      - uses: Swatinem/rust-cache@8cbdedb5103daa674dcf46d3590fe06a76645684 # v2.8.0
+        with:
+          workspaces: tool/src-tauri
+      - run: pnpm install --frozen-lockfile
+      - name: Signing key
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
+          PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE" || { echo "The ANDROID_KEYSTORE secret is missing."; exit 1; }
+          echo "$KEYSTORE" | base64 -d > src-tauri/gen/android/release.keystore
+          printf 'storeFile=release.keystore\npassword=%s\nkeyAlias=glasshome\n' "$PASSWORD" > src-tauri/gen/android/keystore.properties
+      - name: Build the phone app (64- and 32-bit ARM)
+        run: |
+          export NDK_HOME="$ANDROID_NDK_LATEST_HOME" JAVA_HOME="$JAVA_HOME_17_X64"
+          pnpm tauri android build --apk --target aarch64 --target armv7
+          cp src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk Glass-Home-Android.apk
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Glass-Home-Android
+          path: tool/Glass-Home-Android.apk
+          if-no-files-found: error
+
   release:
-    needs: [windows, macos]
+    needs: [windows, macos, android]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -102,3 +142,4 @@ jobs:
           files: |
             out/Glass Home.exe
             out/Glass-Home-macOS.zip
+            out/Glass-Home-Android.apk
