@@ -156,9 +156,8 @@ pub fn reboot_and_wait(adb: &Adb) -> Result<(), String> {
         adb.sh("reboot");
     }
     thread::sleep(Duration::from_secs(30));
-    let serial = adb.serial();
     for _ in 0..40 {
-        let _ = adb.raw(&["connect", &serial]);
+        adb.forget();
         if adb.sh1("getprop sys.boot_completed") == "1" && adb.sh1("cat /proc/sys/kernel/random/boot_id") != before {
             thread::sleep(Duration::from_secs(8));
             return Ok(());
@@ -166,6 +165,41 @@ pub fn reboot_and_wait(adb: &Adb) -> Result<(), String> {
         thread::sleep(Duration::from_secs(4));
     }
     Err("The Fire TV did not come back after the restart. Please check the TV.".into())
+}
+
+/// A copy of the tool's notes on the TV itself (shell-only, kept through reboots and app removals),
+/// so Restore still works when the phone that ran Debloat died, was reset, or the TV's address changed.
+pub const TV_NOTES: &str = "/data/local/tmp/glasshome";
+
+pub fn keep_on_tv(adb: &Adb, local: &Path) {
+    let Some(name) = local.file_name().and_then(|n| n.to_str()) else { return };
+    adb.sh(&format!("mkdir -p {TV_NOTES} && chmod 700 {TV_NOTES}"));
+    let remote = format!("{TV_NOTES}/{name}");
+    // The settings listing is this TV's own business: readable by the shell user only, not by apps.
+    if adb.push(local, &remote).is_ok() {
+        adb.sh(&format!("chmod 600 {remote}"));
+    }
+}
+
+/// The note from this device, or else the TV's copy (written to this device for next time).
+pub fn local_or_tv(adb: &Adb, dir: &Path, name: &str) -> String {
+    let local = dir.join(name);
+    if let Ok(t) = std::fs::read_to_string(&local) {
+        if !t.trim().is_empty() {
+            return t;
+        }
+    }
+    if adb.sh1(&format!("[ -s {TV_NOTES}/{name} ] && echo yes")) == "yes" && adb.pull(&format!("{TV_NOTES}/{name}"), &local).is_ok() {
+        return std::fs::read_to_string(&local).unwrap_or_default();
+    }
+    String::new()
+}
+
+/// Writes through a temporary file, so a phone dying mid-write leaves the old file or none.
+pub fn write_atomic(path: &Path, text: &str) -> std::io::Result<()> {
+    let part = path.with_extension("part");
+    std::fs::write(&part, text)?;
+    std::fs::rename(&part, path)
 }
 
 /// Where the tool keeps what it needs to undo its work on this TV (settings snapshot, log).
@@ -186,10 +220,20 @@ pub fn config_path(sdk: u32, pkg: &str) -> String {
 
 /// key=value lines of the launcher's home.conf on the TV.
 pub fn read_config(adb: &Adb, sdk: u32, pkg: &str) -> Vec<(String, String)> {
-    let mut text = adb.sh(&format!("cat {}", config_path(sdk, pkg)));
+    read_config_checked(adb, sdk, pkg).unwrap_or_default()
+}
+
+/// The launcher's settings, or an Err when the TV did not answer: a reinstall must never take a
+/// dropped connection for "no settings" and start over with the defaults.
+pub fn read_config_checked(adb: &Adb, sdk: u32, pkg: &str) -> Result<Vec<(String, String)>, String> {
+    let mut text = adb.try_sh(&format!("cat {}", config_path(sdk, pkg)))?;
     if sdk >= 30 && text.contains("No such file") {
-        text = adb.sh(&format!("cat /sdcard/Android/data/{pkg}/files/home.conf"));
+        text = adb.try_sh(&format!("cat /sdcard/Android/data/{pkg}/files/home.conf"))?;
     }
+    Ok(parse_config(&text))
+}
+
+fn parse_config(text: &str) -> Vec<(String, String)> {
     text.lines()
         .filter(|l| !l.starts_with('#') && l.contains('='))
         .filter_map(|l| l.split_once('=').map(|(k, v)| (k.trim().to_string(), v.trim().to_string())))
@@ -218,9 +262,9 @@ pub fn state(adb: &Adb, sdk: u32) -> State {
 }
 
 /// The apps the owner installed, each with the name the TV shows. The name comes from the
-/// app itself (aapt2 reads its pulled APK), never from the package id: a guessed name once
+/// app itself (read from its pulled APK), never from the package id: a guessed name once
 /// cost an owner their IPTV player. Names are cached by APK path, which changes on update.
-pub fn user_apps(adb: &Adb, aapt2: &Path, cache_dir: &Path) -> Vec<App> {
+pub fn user_apps(adb: &Adb, cache_dir: &Path) -> Vec<App> {
     let skip = [GLASS, LEGACY, DNSFILTER];
     let cache_file = cache_dir.join("labels.json");
     let mut cache: HashMap<String, String> =
@@ -238,7 +282,7 @@ pub fn user_apps(adb: &Adb, aapt2: &Path, cache_dir: &Path) -> Vec<App> {
         let label = match cache.get(path) {
             Some(l) => l.clone(),
             None => {
-                let l = read_label(adb, aapt2, cache_dir, path).unwrap_or_else(|| pkg.to_string());
+                let l = read_label(adb, cache_dir, path).unwrap_or_else(|| pkg.to_string());
                 cache.insert(path.to_string(), l.clone());
                 l
             }
@@ -250,20 +294,11 @@ pub fn user_apps(adb: &Adb, aapt2: &Path, cache_dir: &Path) -> Vec<App> {
     out
 }
 
-fn read_label(adb: &Adb, aapt2: &Path, dir: &Path, remote: &str) -> Option<String> {
+/// The app's name from its manifest and resources, as the TV shows it.
+fn read_label(adb: &Adb, dir: &Path, remote: &str) -> Option<String> {
     let local = dir.join("probe.apk");
     adb.pull(remote, &local).ok()?;
-    let mut c = std::process::Command::new(aapt2);
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        c.creation_flags(0x0800_0000);
-    }
-    let out = c.args(["dump", "badging"]).arg(&local).output().ok()?;
+    let label = apk_info::Apk::new(&local).ok().and_then(|a| a.get_application_label());
     let _ = std::fs::remove_file(&local);
-    let text = String::from_utf8_lossy(&out.stdout);
-    let pick = |prefix: &str| {
-        text.lines().find_map(|l| l.strip_prefix(prefix).and_then(|v| v.strip_prefix('\'')).and_then(|v| v.strip_suffix('\'')).map(str::to_string))
-    };
-    pick("application-label-de:").or_else(|| pick("application-label:")).filter(|l| !l.is_empty())
+    label.map(|l| l.trim().to_string()).filter(|l| !l.is_empty())
 }

@@ -5,7 +5,7 @@
 use crate::adb::Adb;
 use crate::device::{self, DNSFILTER};
 use crate::lists::Lists;
-use crate::steps::Steps;
+use crate::steps::{Steps, LOST};
 use crate::ui;
 use std::collections::HashSet;
 use std::path::Path;
@@ -14,17 +14,25 @@ pub fn run(adb: &Adb, sdk: u32, dir: &Path, s: &mut Steps) -> bool {
     let lists = Lists::for_sdk(sdk);
 
     // 1. HOME back to Amazon, the launcher removed.
-    s.run("home");
+    if !s.start(adb, "home") {
+        return false;
+    }
     ui::undo(adb, sdk);
     s.done("home", None::<String>);
 
     // 2. Packages back on.
-    s.run("packages");
+    if !s.start(adb, "packages") {
+        return false;
+    }
     let mut all: Vec<String> = lists.packages.clone();
     all.extend(lists.alexa.iter().cloned());
     all.extend(lists.user_apps.iter().cloned());
     all.push("com.amazon.firetv.youtube".into());
     let have = device::installed(adb);
+    if have.is_empty() {
+        s.fail("packages", LOST);
+        return false;
+    }
     let off = device::disabled(adb);
     let mut seen = HashSet::new();
     let mut on = 0;
@@ -44,8 +52,10 @@ pub fn run(adb: &Adb, sdk: u32, dir: &Path, s: &mut Steps) -> bool {
     s.done("packages", Some(format!("{on} back on")));
 
     // 3. Services that were only limited.
-    s.run("limits");
-    let log = std::fs::read_to_string(dir.join("debloat.txt")).unwrap_or_default();
+    if !s.start(adb, "limits") {
+        return false;
+    }
+    let log = device::local_or_tv(adb, dir, "debloat.txt");
     let mut limited: Vec<String> = log.lines().filter_map(|l| l.split('\t').next()).map(str::to_string).collect();
     limited.extend(lists.protected.iter().cloned());
     let mut seen = HashSet::new();
@@ -59,8 +69,10 @@ pub fn run(adb: &Adb, sdk: u32, dir: &Path, s: &mut Steps) -> bool {
     s.done("limits", None::<String>);
 
     // 4. Settings: this TV's own earlier values where the tool saved them, else stock ones.
-    s.run("settings");
-    let snapshot = |ns: &str| std::fs::read_to_string(dir.join(format!("settings-before-{ns}.txt"))).unwrap_or_default();
+    if !s.start(adb, "settings") {
+        return false;
+    }
+    let snapshot = |ns: &str| device::local_or_tv(adb, dir, &format!("settings-before-{ns}.txt"));
     let (secure, global) = (snapshot("secure"), snapshot("global"));
     let before = |ns: &str, key: &str| -> Option<String> {
         let text = if ns == "secure" { &secure } else { &global };
@@ -78,7 +90,9 @@ pub fn run(adb: &Adb, sdk: u32, dir: &Path, s: &mut Steps) -> bool {
     s.done("settings", Some(if secure.is_empty() { "Amazon defaults".into() } else { "as before".into() }));
 
     // 5. The DNS filter. Removing it stops the VPN, which can cut the network adb session.
-    s.run("filter");
+    if !s.start(adb, "filter") {
+        return false;
+    }
     adb.sh("settings delete secure always_on_vpn_app");
     if have.contains(DNSFILTER) {
         adb.sh(&format!("pm uninstall {DNSFILTER}"));
@@ -89,12 +103,15 @@ pub fn run(adb: &Adb, sdk: u32, dir: &Path, s: &mut Steps) -> bool {
     }
 
     // 6. Restart.
-    s.run("reboot");
+    if !s.start(adb, "reboot") {
+        return false;
+    }
     if let Err(e) = device::reboot_and_wait(adb) {
         s.fail("reboot", &e);
         return false;
     }
     let _ = std::fs::remove_file(dir.join("debloat.txt"));
+    adb.sh(&format!("rm -f {}/debloat.txt", device::TV_NOTES));
     s.done("reboot", None::<String>);
     !s.failed
 }

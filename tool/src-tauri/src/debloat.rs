@@ -6,7 +6,7 @@
 use crate::adb::Adb;
 use crate::device::{self, DNSFILTER};
 use crate::lists::{self, Lists, OTA_HOSTS, OTA_PACKAGES};
-use crate::steps::Steps;
+use crate::steps::{Steps, LOST};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
@@ -40,18 +40,41 @@ pub fn run(adb: &Adb, sdk: u32, dir: &Path, o: &Options, s: &mut Steps) -> bool 
     let lists = Lists::for_sdk(sdk);
 
     // 1. Snapshot the settings before the first change, for Restore. Later runs keep the original.
-    s.run("backup");
-    let secure = dir.join("settings-before-secure.txt");
-    if !secure.exists() {
-        let _ = std::fs::write(&secure, adb.sh("settings list secure"));
-        let _ = std::fs::write(dir.join("settings-before-global.txt"), adb.sh("settings list global"));
-        s.done("backup", Some("saved".into()));
-    } else {
-        s.done("backup", Some("already saved".into()));
+    if !s.start(adb, "backup") {
+        return false;
     }
+    // Taken whole or not at all: a half-written or empty snapshot would make Restore put back
+    // Amazon's defaults instead of this TV's own settings. The secure file is written last and
+    // marks a complete snapshot. A copy goes onto the TV, for Restore from another device.
+    let secure = dir.join("settings-before-secure.txt");
+    let global = dir.join("settings-before-global.txt");
+    if secure.exists() && global.exists() {
+        s.done("backup", Some("already saved".into()));
+    } else if !device::local_or_tv(adb, dir, "settings-before-global.txt").is_empty()
+        && !device::local_or_tv(adb, dir, "settings-before-secure.txt").is_empty()
+    {
+        s.done("backup", Some("taken from the TV".into()));
+    } else {
+        let (g, sc) = match (adb.try_sh("settings list global"), adb.try_sh("settings list secure")) {
+            (Ok(g), Ok(sc)) if looks_like_settings(&g) && looks_like_settings(&sc) => (g, sc),
+            _ => {
+                s.fail("backup", LOST);
+                return false;
+            }
+        };
+        if device::write_atomic(&global, &g).and_then(|_| device::write_atomic(&secure, &sc)).is_err() {
+            s.fail("backup", "Could not save the settings on this device; nothing was changed.");
+            return false;
+        }
+        s.done("backup", Some("saved".into()));
+    }
+    device::keep_on_tv(adb, &global);
+    device::keep_on_tv(adb, &secure);
 
     // 2. Amazon packages.
-    s.run("packages");
+    if !s.start(adb, "packages") {
+        return false;
+    }
     let keep: HashSet<&str> = if o.keep_updates { OTA_PACKAGES.iter().copied().collect() } else { HashSet::new() };
     let never: HashSet<&String> = lists.never.iter().collect();
     let mut cleanup = lists.packages.clone();
@@ -59,6 +82,10 @@ pub fn run(adb: &Adb, sdk: u32, dir: &Path, o: &Options, s: &mut Steps) -> bool 
         cleanup.extend(lists.alexa.iter().cloned());
     }
     let have = device::installed(adb);
+    if have.is_empty() {
+        s.fail("packages", LOST);
+        return false;
+    }
     let mut log = String::new();
     let (mut off, mut protected) = (0, 0);
     for p in cleanup.iter().filter(|p| have.contains(*p) && !never.contains(p) && !keep.contains(p.as_str())) {
@@ -78,7 +105,9 @@ pub fn run(adb: &Adb, sdk: u32, dir: &Path, o: &Options, s: &mut Steps) -> bool 
     s.done("packages", Some(format!("{off} off{}", if protected > 0 { format!(", {protected} protected") } else { String::new() })));
 
     // 3. Apps the owner picked: store apps are uninstalled, the TV's own are disabled.
-    s.run("apps");
+    if !s.start(adb, "apps") {
+        return false;
+    }
     if o.remove.is_empty() {
         s.skip("apps", "none selected");
     } else {
@@ -99,7 +128,9 @@ pub fn run(adb: &Adb, sdk: u32, dir: &Path, o: &Options, s: &mut Steps) -> bool 
     }
 
     // 4. Packages that keep running after their disable: background work off, metered data blocked.
-    s.run("starve");
+    if !s.start(adb, "starve") {
+        return false;
+    }
     let running: HashSet<String> = adb.sh("ps -A -o NAME").lines().map(|l| l.trim().to_string()).collect();
     let mut starved = 0;
     for p in cleanup.iter().filter(|p| running.contains(*p) && !never.contains(p) && !keep.contains(p.as_str())) {
@@ -123,9 +154,12 @@ pub fn run(adb: &Adb, sdk: u32, dir: &Path, o: &Options, s: &mut Steps) -> bool 
     }
     s.done("starve", Some(format!("{starved} services")));
     append(&dir.join("debloat.txt"), &log);
+    device::keep_on_tv(adb, &dir.join("debloat.txt"));
 
     // 5. Privacy settings.
-    s.run("settings");
+    if !s.start(adb, "settings") {
+        return false;
+    }
     let mut n = 0;
     let mut all = lists.settings.clone();
     if !o.keep_alexa {
@@ -139,7 +173,9 @@ pub fn run(adb: &Adb, sdk: u32, dir: &Path, o: &Options, s: &mut Steps) -> bool 
 
     // 6. The DNS filter.
     if o.dns_filter {
-        s.run("filter");
+        if !s.start(adb, "filter") {
+            return false;
+        }
         match dns_filter(adb, sdk, o) {
             Ok(Some(entries)) => s.done("filter", Some(format!("{entries} entries"))),
             Ok(None) => s.skip("filter", "not yet on Fire OS 8"),
@@ -150,7 +186,9 @@ pub fn run(adb: &Adb, sdk: u32, dir: &Path, o: &Options, s: &mut Steps) -> bool 
     }
 
     // 7. Restart, so Fire OS reloads the package state and the filter starts as always-on VPN.
-    s.run("reboot");
+    if !s.start(adb, "reboot") {
+        return false;
+    }
     adb.sh("appops write-settings");
     if let Err(e) = device::reboot_and_wait(adb) {
         s.fail("reboot", &e);
@@ -159,7 +197,9 @@ pub fn run(adb: &Adb, sdk: u32, dir: &Path, o: &Options, s: &mut Steps) -> bool 
     s.done("reboot", None::<String>);
 
     // 8. Check.
-    s.run("verify");
+    if !s.start(adb, "verify") {
+        return false;
+    }
     let off_now = device::disabled(adb);
     let count = cleanup.iter().filter(|p| off_now.contains(*p)).count();
     if o.dns_filter && sdk < 30 {
@@ -185,6 +225,11 @@ pub fn run(adb: &Adb, sdk: u32, dir: &Path, o: &Options, s: &mut Steps) -> bool 
     }
     s.done("verify", Some(format!("{count} packages off")));
     !s.failed
+}
+
+/// A settings listing, not an empty or broken answer.
+fn looks_like_settings(text: &str) -> bool {
+    text.lines().filter(|l| l.contains('=')).count() >= 5
 }
 
 fn append(file: &Path, text: &str) {
@@ -444,7 +489,8 @@ fn tap_allow(adb: &Adb) -> bool {
     true
 }
 
-/// Runs `adb restore` and answers the TV's confirmation (dumbtv's restore_app_data). Android
+/// Restores the archive with `bu restore` on the TV (what adbd runs for `adb restore`) and
+/// answers the TV's confirmation (dumbtv's restore_app_data). Android
 /// logs "processing complete" even for a refused request, so success also needs its "taking
 /// data" line and no read error.
 fn restore_into_app(adb: &Adb, sdk: u32, tmp: &Path, conf: &str, list: &str, count: &str) -> Result<(), String> {
@@ -462,18 +508,22 @@ fn restore_into_app(adb: &Adb, sdk: u32, tmp: &Path, conf: &str, list: &str, cou
     let fail0 = restore_count(adb, &["ErrnoException", "timed out waiting for user confirmation"]);
     adb.sh("am force-stop com.android.backupconfirm");
 
-    let serial = adb.serial();
-    let ab_arg = ab.to_string_lossy().to_string();
-    let exe = adb.exe().to_path_buf();
-    let child = thread::spawn(move || {
-        let mut c = std::process::Command::new(exe);
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            c.creation_flags(0x0800_0000);
-        }
-        let _ = c.args(["-s", &serial, "restore", &ab_arg]).output();
+    const REMOTE_AB: &str = "/data/local/tmp/glasshome-appdata.ab";
+    adb.push(&ab, REMOTE_AB)?;
+    // Runs until the restore is confirmed or refused; the steps below watch and answer the TV
+    // meanwhile, on their own connections.
+    let child = thread::scope(|s| {
+        let run = s.spawn(|| adb.sh(&format!("bu restore < {REMOTE_AB}")));
+        let r = answer_restore(adb, &run, (done0, took0, fail0));
+        let _ = run.join();
+        r
     });
+    adb.sh(&format!("rm -f {REMOTE_AB}"));
+    child
+}
+
+/// Waits for the confirmation, presses Allow, and waits for the restore to finish.
+fn answer_restore(adb: &Adb, child: &thread::ScopedJoinHandle<'_, String>, (done0, took0, fail0): (usize, usize, usize)) -> Result<(), String> {
     for _ in 0..40 {
         if confirmation_shown(adb) || child.is_finished() {
             break;

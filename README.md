@@ -3,7 +3,7 @@
 <p align="center">
   <b>A glass home screen for your Fire TV, set up from Windows or Mac.</b><br>
   Your colours, your own photos, a slideshow, and Amazon's ads turned off.<br>
-  A small Tauri app with adb built in. No root, no terminal, undo in one click.
+  A small Tauri app that speaks adb itself. No root, no terminal, undo in one click.
 </p>
 
 <p align="center">
@@ -40,7 +40,7 @@ Glass Home is two things:
 
 - **A desktop tool** for Windows and macOS. It finds your Fire TV on the network, turns off
   Amazon's ad, tracking and telemetry packages, and installs the new home screen over adb. It
-  brings its own adb, so there is nothing else to install.
+  speaks adb itself, in Rust, so there is no adb or anything else to install.
 - **A home screen** for the TV (`launcher/`), plain Java without libraries, package
   `app.glasshome.tv`.
 
@@ -56,7 +56,7 @@ Nothing on the TV's system partition changes. **Restore** turns everything back 
 >   TypeScript for the window ([`tool/src`](tool/src)).
 > - Ideas waiting for someone: an ad-free screensaver with the slideshow, a quick menu on a long
 >   press of Home, the remote's app buttons opening apps of your choice, a kids mode, Android TV
->   and Google TV support, an adb client written in Rust instead of the bundled one.
+>   and Google TV support, the same tool on Android phones.
 >
 > Pull requests are welcome; so is a fork that goes its own way.
 
@@ -143,8 +143,7 @@ resets the settings saved before the first debloat and removes the DNS filter an
 
 ## Build from source
 
-The desktop tool needs Rust, Node 22 and pnpm. The adb, aapt2 and the launcher APK it bundles
-are in the repository, so no Android SDK is needed for the tool alone.
+The desktop tool needs Rust, Node 22 and pnpm. The launcher APK it bundles is in the repository, so no Android SDK is needed for the tool alone.
 
 ```sh
 cd tool && pnpm install && pnpm tauri build        # the app for this computer

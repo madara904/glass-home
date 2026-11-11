@@ -1,8 +1,12 @@
 //! Progress: each step is sent to the window as a `step` event when it changes, or printed when
 //! the tool runs from the command line (`--run`).
 
+use crate::adb::Adb;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
+
+/// What a step says when the TV stopped answering. Every task can run again and continues.
+pub const LOST: &str = "Lost the connection to the Fire TV. Nothing is broken: connect again and run this again; it continues where it stopped.";
 
 #[derive(Serialize, Clone)]
 struct Step<'a> {
@@ -41,6 +45,17 @@ impl Steps {
 
     fn label(&self, id: &str) -> String {
         self.labels.iter().find(|(i, _)| *i == id).map(|(_, l)| l.clone()).unwrap_or_default()
+    }
+
+    /// Starts a step once the TV answers. A phone loses Wi-Fi, sleeps or dies mid-run; rather than
+    /// carry on blind, this waits up to ~45 s for the TV and otherwise stops the task here.
+    pub fn start(&mut self, adb: &Adb, id: &str) -> bool {
+        if adb.alive() || adb.reconnect() {
+            self.run(id);
+            return true;
+        }
+        self.fail(id, LOST);
+        false
     }
 
     pub fn run(&self, id: &str) {

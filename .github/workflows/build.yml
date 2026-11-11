@@ -1,6 +1,6 @@
 # Builds the desktop tool as programs that run without installing: one Glass Home.exe for
-# Windows, Glass Home.app (Apple Silicon and Intel in one) for macOS. adb, aapt2 and the TV
-# app are built into the program. Every run publishes both files as a GitHub release: started
+# Windows, Glass Home.app (Apple Silicon and Intel in one) for macOS. The TV app is built into
+# the program; adb is spoken by the program itself. Every run publishes both files as a GitHub release: started
 # by hand, it tags the commit v<version> from tool/src-tauri/tauri.conf.json itself (a new
 # version there means a new release; the same version again replaces that release's files);
 # a pushed tag like v0.2.0 releases under that tag.

@@ -11,9 +11,13 @@ export const isMac = /Mac/i.test(navigator.platform || navigator.userAgent);
 
 document.documentElement.classList.toggle('mac', isMac);
 
-/** Window buttons for the right end of the top bar; none on macOS. */
+/** Phones get one column and the panels as bottom sheets. `?phone` shows that layout in a browser. */
+export const isPhone = /Android|iPhone|iPad/i.test(navigator.userAgent) || new URLSearchParams(location.search).has('phone');
+document.documentElement.classList.toggle('phone', isPhone);
+
+/** Window buttons for the right end of the top bar; none on macOS or a phone. */
 export function windowButtons(): string {
-  if (isMac) return '';
+  if (isMac || isPhone) return '';
   return `<div class="winbtns">
     <button class="winbtn" data-win="min" aria-label="Minimize">${icon.winMin(16)}</button>
     <button class="winbtn" data-win="max" aria-label="Maximize">${icon.winMax(16)}</button>
@@ -55,7 +59,7 @@ const NO_DRAG = 'button, a, input, [data-no-drag], .menu';
 // Dragging: a press on an empty part of the top bar starts a native window move; a double
 // click maximizes, as on a system title bar.
 document.addEventListener('mousedown', (e) => {
-  if (!inTauri || e.button !== 0) return;
+  if (!inTauri || isPhone || e.button !== 0) return;
   const target = e.target as Element;
   if (!target.closest('.top') || target.closest(NO_DRAG)) return;
   if (e.detail === 2) void getCurrentWindow().toggleMaximize();

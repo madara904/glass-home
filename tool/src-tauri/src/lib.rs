@@ -12,19 +12,59 @@ mod steps;
 mod ui;
 
 use adb::Adb;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use steps::Steps;
 use tauri::{AppHandle, Manager, State};
 
 struct Ctx {
     adb: Arc<Adb>,
+    /// The task running now; a second one waits its turn (a double tap on a phone).
+    task: Mutex<Option<String>>,
     device: Mutex<Option<device::Device>>,
     resources: PathBuf,
     data: PathBuf,
 }
 
 type Res<T> = Result<T, String>;
+
+/// A task that did not finish: the app was killed or the phone died while it ran.
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+struct Unfinished {
+    task: String,
+    name: String,
+    ip: String,
+}
+
+/// Marks a task as running, here and on disk. The note on disk only outlives the task when the
+/// process dies with it; the next start then says which task on which TV did not finish.
+fn begin(ctx: &Ctx, task: &str, d: &device::Device) -> Res<()> {
+    let mut t = ctx.task.lock().unwrap();
+    if t.is_some() {
+        return Err("Another task is still running. Wait for it to finish.".into());
+    }
+    *t = Some(task.to_string());
+    let note = Unfinished { task: task.into(), name: d.name.clone(), ip: d.ip.clone() };
+    let _ = device::write_atomic(&ctx.data.join("running.json"), &serde_json::to_string(&note).unwrap_or_default());
+    Ok(())
+}
+
+fn end(ctx: &Ctx) {
+    *ctx.task.lock().unwrap() = None;
+    let _ = std::fs::remove_file(ctx.data.join("running.json"));
+}
+
+/// The task the last run of the app did not finish, once; nothing while a task still runs.
+#[tauri::command]
+fn unfinished(ctx: State<'_, Ctx>) -> Option<Unfinished> {
+    if ctx.task.lock().unwrap().is_some() {
+        return None;
+    }
+    let path = ctx.data.join("running.json");
+    let note = std::fs::read_to_string(&path).ok().and_then(|s| serde_json::from_str(&s).ok());
+    let _ = std::fs::remove_file(&path);
+    note
+}
 
 fn current(ctx: &Ctx) -> Res<device::Device> {
     ctx.device.lock().unwrap().clone().ok_or_else(|| "No Fire TV connected.".to_string())
@@ -104,9 +144,8 @@ async fn device_state(ctx: State<'_, Ctx>) -> Res<device::State> {
 async fn user_apps(ctx: State<'_, Ctx>) -> Res<Vec<device::App>> {
     let d = current(&ctx)?;
     let adb = ctx.adb.clone();
-    let aapt2 = aapt2_path(&ctx.resources);
     let cache = device::device_dir(&ctx.data, &d.serial);
-    blocking(move || device::user_apps(&adb, &aapt2, &cache)).await
+    blocking(move || device::user_apps(&adb, &cache)).await
 }
 
 #[tauri::command]
@@ -114,11 +153,14 @@ async fn run_debloat(app: AppHandle, options: debloat::Options, ctx: State<'_, C
     let d = current(&ctx)?;
     let adb = ctx.adb.clone();
     let dir = device::device_dir(&ctx.data, &d.serial);
-    blocking(move || {
+    begin(&ctx, "debloat", &d)?;
+    let r = blocking(move || {
         let mut s = debloat_steps(Some(&app));
         debloat::run(&adb, d.sdk, &dir, &options, &mut s)
     })
-    .await
+    .await;
+    end(&ctx);
+    r
 }
 
 #[tauri::command]
@@ -126,11 +168,14 @@ async fn run_install_ui(app: AppHandle, options: ui::Options, ctx: State<'_, Ctx
     let d = current(&ctx)?;
     let adb = ctx.adb.clone();
     let apk = ctx.resources.join("glass-home.apk");
-    blocking(move || {
+    begin(&ctx, "ui", &d)?;
+    let r = blocking(move || {
         let mut s = ui_steps(Some(&app));
         ui::run(&adb, d.sdk, &apk, &options, &mut s)
     })
-    .await
+    .await;
+    end(&ctx);
+    r
 }
 
 /// The owner's photo as the TV's wallpaper, with a colour scheme; see ui::send_wallpaper.
@@ -168,17 +213,20 @@ async fn run_restore(app: AppHandle, ctx: State<'_, Ctx>) -> Res<bool> {
     let d = current(&ctx)?;
     let adb = ctx.adb.clone();
     let dir = device::device_dir(&ctx.data, &d.serial);
-    blocking(move || {
+    begin(&ctx, "restore", &d)?;
+    let r = blocking(move || {
         let mut s = restore_steps(Some(&app));
         restore::run(&adb, d.sdk, &dir, &mut s)
     })
-    .await
+    .await;
+    end(&ctx);
+    r
 }
 
 /// Opens the project's or one of the authors' GitHub pages in the default browser. Only these
 /// addresses.
 #[tauri::command]
-fn open_github(user: String) {
+fn open_github(app: AppHandle, user: String) {
     let url = match user.as_str() {
         "glass-home" => "https://github.com/madara904/glass-home",
         "madara904" => "https://github.com/madara904",
@@ -192,6 +240,13 @@ fn open_github(user: String) {
     }
     #[cfg(target_os = "macos")]
     let _ = std::process::Command::new("open").arg(url).spawn();
+    #[cfg(mobile)]
+    {
+        use tauri_plugin_opener::OpenerExt;
+        let _ = app.opener().open_url(url, None::<&str>);
+    }
+    #[cfg(not(mobile))]
+    let _ = app;
 }
 
 /// The right-click menu's "Developer tools": the web inspector, in release builds too.
@@ -211,14 +266,7 @@ pub fn discover_cli() {
 /// `--probe <ip>`: connects, prints what the window would show (device, state, apps) and quits.
 /// Reads only; for checking a TV without clicking through the window.
 pub fn probe(ip: &str) {
-    let base = match bundled::unpack(&std::env::temp_dir().join("glasshome-cli")) {
-        Ok(b) => b,
-        Err(e) => {
-            eprintln!("could not unpack adb: {e}");
-            return Default::default();
-        }
-    };
-    let adb = Adb::new(adb_path(&base));
+    let adb = Adb::new(adb::key_path(&cli_data()));
     if let Err(e) = adb.connect(ip) {
         eprintln!("{e}");
         return;
@@ -231,19 +279,12 @@ pub fn probe(ip: &str) {
     println!("{}", serde_json::to_string_pretty(&device::state(&adb, d.sdk)).unwrap_or_default());
     let cache = std::env::temp_dir().join("glasshome-probe");
     let _ = std::fs::create_dir_all(&cache);
-    println!("{}", serde_json::to_string_pretty(&device::user_apps(&adb, &aapt2_path(&base), &cache)).unwrap_or_default());
+    println!("{}", serde_json::to_string_pretty(&device::user_apps(&adb, &cache)).unwrap_or_default());
 }
 
 /// `--wallpaper <ip> <photo.jpg> [scheme]`: the window's own-photo upload, from the command line.
 pub fn wallpaper_cli(ip: &str, photo: &str, theme: &str) -> bool {
-    let base = match bundled::unpack(&std::env::temp_dir().join("glasshome-cli")) {
-        Ok(b) => b,
-        Err(e) => {
-            eprintln!("could not unpack adb: {e}");
-            return false;
-        }
-    };
-    let adb = Adb::new(adb_path(&base));
+    let adb = Adb::new(adb::key_path(&cli_data()));
     if let Err(e) = adb.connect(ip) {
         eprintln!("{e}");
         return false;
@@ -274,11 +315,11 @@ pub fn run_cli(task: &str, ip: &str, data: Option<&str>) -> bool {
     let base = match bundled::unpack(&std::env::temp_dir().join("glasshome-cli")) {
         Ok(b) => b,
         Err(e) => {
-            eprintln!("could not unpack adb: {e}");
+            eprintln!("could not unpack the launcher: {e}");
             return Default::default();
         }
     };
-    let adb = Adb::new(adb_path(&base));
+    let adb = Adb::new(adb::key_path(&cli_data()));
     if let Err(e) = adb.connect(ip) {
         eprintln!("{e}");
         return false;
@@ -309,8 +350,13 @@ pub fn run_cli(task: &str, ip: &str, data: Option<&str>) -> bool {
     }
 }
 
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    // On a phone, links open through the system (an intent); the desktop starts the browser itself.
+    #[cfg(mobile)]
+    let builder = builder.plugin(tauri_plugin_opener::init());
+    builder
         .setup(|app| {
             // Windows 11: the frameless window keeps rounded corners, without the shadow the
             // system frame would bring.
@@ -325,27 +371,30 @@ pub fn run() {
                     }
                 }
             }
-            // adb, aapt2 and the APK are inside the program; they are unpacked next to its data.
+            // The launcher APK is inside the program; it is unpacked next to its data. adb is
+            // spoken by the program itself, with a key kept there too.
             let data = app.path().app_data_dir()?;
             std::fs::create_dir_all(&data)?;
             let resources = bundled::unpack(&data)?;
-            let adb = Arc::new(Adb::new(adb_path(&resources)));
-            app.manage(Ctx { adb, device: Mutex::new(None), resources, data });
+            let adb = Arc::new(Adb::new(adb::key_path(&data)));
+            app.manage(Ctx { adb, task: Mutex::new(None), device: Mutex::new(None), resources, data });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            discover, connect, disconnect, device_state, user_apps, run_debloat, run_install_ui, run_restore, adb_off, set_wallpaper, open_github, open_devtools
+            discover, connect, disconnect, unfinished, device_state, user_apps, run_debloat, run_install_ui, run_restore, adb_off, set_wallpaper, open_github, open_devtools
         ])
         .run(tauri::generate_context!())
         .expect("Glass Home could not start");
 }
 
-/// The bundled adb: adb.exe on Windows, adb on macOS.
-fn adb_path(resources: &Path) -> PathBuf {
-    resources.join("platform-tools").join(format!("adb{}", std::env::consts::EXE_SUFFIX))
-}
-
-fn aapt2_path(resources: &Path) -> PathBuf {
-    resources.join(format!("aapt2{}", std::env::consts::EXE_SUFFIX))
+/// Where the command-line modes keep their key: the window's data folder, so a TV that allowed
+/// the window also allows them.
+fn cli_data() -> PathBuf {
+    let base = std::env::var_os(if cfg!(windows) { "APPDATA" } else { "HOME" }).map(PathBuf::from).unwrap_or_else(std::env::temp_dir);
+    if cfg!(target_os = "macos") {
+        base.join("Library/Application Support/app.glasshome.tool")
+    } else {
+        base.join("app.glasshome.tool")
+    }
 }
 

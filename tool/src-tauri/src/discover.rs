@@ -61,7 +61,8 @@ pub fn discover() -> Result<Vec<Found>, String> {
     let me = local_v4()?;
     let heard = thread::spawn(|| listen(LISTEN));
 
-    let open = scan(me);
+    // A phone with wireless debugging on answers on the adb port itself; it is not a TV.
+    let open: Vec<Ipv4Addr> = scan(me).into_iter().filter(|&ip| ip != me).collect();
     let looked: Vec<_> = open
         .iter()
         .map(|&ip| thread::spawn(move || (ip, chromecast_name(ip), host_name(ip), mac_vendor(ip))))

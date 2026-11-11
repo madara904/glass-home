@@ -1,7 +1,7 @@
 import { api, THEMES, type App, type DebloatOptions, type Device, type Found, type DeviceState, type Step, type UiOptions, type Theme } from './api';
 import { flag, icon, mark } from './icons';
 import { lang, setLang, t, tr, type Lang } from './i18n';
-import { AUTHORS, REPO, openDevtools, openGithub, windowAction, windowButtons } from './titlebar';
+import { AUTHORS, REPO, isPhone, openDevtools, openGithub, windowAction, windowButtons } from './titlebar';
 import { splash } from './splash';
 
 // The desktop tool in the look of the app icon: its colours as the backdrop, frosted white glass
@@ -57,7 +57,7 @@ function introView() {
         ${step(icon.settings(), t.introAbout, t.introAboutPath)}
         ${step(icon.press(), t.introPress, t.introPressPath)}
         ${step(icon.toggle(), t.introAdb, t.introAdbPath)}
-        ${step(icon.wifi(), t.introWifi, t.introWifiPath)}
+        ${step(icon.wifi(), t.introWifi, isPhone ? t.introWifiPathPhone : t.introWifiPath)}
       </div>
       <div class="below"><button class="go" data-act="intro-done">${t.introGo}</button><span class="aside">${icon.info(16)}${t.introVega}</span></div>
     `);
@@ -92,6 +92,7 @@ function connectView(error = '', search = true) {
   const ip = document.getElementById('ip') as HTMLInputElement;
   ip.addEventListener('keydown', (e) => { if (e.key === 'Enter') connect(ip.value); });
   if (search && !searching) scan();
+  showNotice();
 }
 
 async function connect(ip: string) {
@@ -128,7 +129,8 @@ function foundList(): string {
   const row = (d: Found) => {
     const name = esc(d.name || d.ip);
     const what = d.model || (d.kind === 'fire' ? t.fireTv : d.vendor);
-    const path = `<span class="path">${what ? `${esc(what)} · ` : ''}${esc(d.ip)}</span>`;
+    // Without a name the address is the title; it is not repeated underneath.
+    const path = `<span class="path">${[what ? esc(what) : '', d.name ? esc(d.ip) : ''].filter(Boolean).join(' · ')}</span>`;
     if (d.kind === 'google') {
       return `<button class="row small" disabled>${icon.tv()}<span class="name">${name}${path}</span><span class="value">${t.notFire}</span></button>`;
     }
@@ -310,7 +312,7 @@ function uiPanel() {
         <button class="photo-prev" id="photoPrev" data-act="pick-photo" aria-label="${t.choosePhoto}" title="${t.choosePhoto}">
           <span class="photo-img"></span><span class="photo-hover">${icon.upload(22)}</span>
         </button>
-        <p class="photo-status" id="photoStatus">${t.photoNote}</p>
+        <p class="photo-status" id="photoStatus">${isPhone ? t.photoNotePhone : t.photoNote}</p>
         <input type="file" id="photoFile" accept="image/jpeg,image/png,image/webp" hidden>
       </div>
       <div class="label">${t.tiles}</div>
@@ -423,7 +425,7 @@ async function run(panel: HTMLElement, title: string, task: (onStep: (s: Step) =
   view = () => {};
   const steps = new Map<string, Step>();
   panel.innerHTML = `
-    <header><h2>${esc(title)}</h2><p>${t.keepOn}</p></header>
+    <header><h2>${esc(title)}</h2><p>${isPhone ? t.keepOpen : t.keepOn}</p></header>
     <div class="body"><div id="steps"></div><div id="summary"></div></div>
     <footer><button class="go" data-act="done" disabled>${t.done}</button></footer>`;
   const list = panel.querySelector('#steps')!;
@@ -508,4 +510,27 @@ document.addEventListener('mousedown', (e) => { if (!ctx.contains(e.target as No
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideCtx(); });
 window.addEventListener('blur', hideCtx);
 
-splash(() => (introSeen() ? connectView() : introView()));
+/** After a start: says which task the last run did not finish, on the connect screen. */
+async function noteUnfinished() {
+  const u = await api.unfinished().catch(() => null);
+  if (!u) return;
+  const task = u.task === 'debloat' ? t.debloat : u.task === 'ui' ? t.glassUi : t.restore;
+  notice = t.unfinished(task, u.name || u.ip);
+  showNotice();
+}
+
+/** The note about an unfinished task waits for the connect screen (the intro may come first). */
+let notice = '';
+function showNotice() {
+  const err = document.getElementById('err');
+  if (!notice || !err || err.textContent) return;
+  err.textContent = notice;
+  err.classList.add('calm');
+  notice = '';
+}
+
+splash(() => {
+  if (introSeen()) connectView();
+  else introView();
+  void noteUnfinished();
+});
