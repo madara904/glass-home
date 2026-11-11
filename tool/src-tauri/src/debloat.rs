@@ -227,6 +227,19 @@ pub fn run(adb: &Adb, sdk: u32, dir: &Path, o: &Options, s: &mut Steps) -> bool 
     !s.failed
 }
 
+/// Starts the filter's VPN now: the app opens its window to start it, then the home screen comes
+/// back (Glass Home when it is installed). Starting the VPN can cut adb; the connection returns.
+fn start_filter(adb: &Adb) {
+    adb.sh(&format!("am start -n {DNSFILTER}/.DNSProxyActivity"));
+    thread::sleep(Duration::from_secs(6));
+    adb.reconnect();
+    if device::installed(adb).contains(device::GLASS) {
+        adb.sh(&format!("am start -n {}/.Home", device::GLASS));
+    } else {
+        adb.sh("input keyevent KEYCODE_HOME");
+    }
+}
+
 /// Whether the filter's list on the TV is the one just sent: its download count, and the lines.
 fn list_on_tv(adb: &Adb, hosts: usize) -> bool {
     let count = adb.sh1(&format!("head -n 1 {FILTER_DIR}/FILTERHOSTS.TXT.DLD_CNT"));
@@ -279,6 +292,15 @@ pub fn dns_filter(adb: &Adb, sdk: u32, o: &Options) -> Result<Option<usize>, Str
     if gw.is_empty() {
         return Err("Could not read the Fire TV's router address.".into());
     }
+    // Where the filter asks for everything it does not block: the network's own DNS servers,
+    // then the router. Not the router alone: behind a Pi-hole or a provider's DNS the TV would
+    // otherwise resolve nothing at all once the filter runs.
+    let mut upstream = device::dns_servers(adb);
+    if !upstream.contains(&gw) {
+        upstream.push(gw.clone());
+    }
+    let fallback = upstream.iter().map(|ip| format!("[{ip}]::53::UDP")).collect::<Vec<_>>().join("; ");
+    let route = upstream.join("; ");
 
     // The list: HaGeZi's Amazon trackers plus dumbtv's hosts, minus what the owner keeps.
     let feed = String::from_utf8_lossy(&fetch(FEED_URL)?).to_string();
@@ -341,9 +363,9 @@ pub fn dns_filter(adb: &Adb, sdk: u32, o: &Options) -> Result<Option<usize>, Str
         } else if line.starts_with("detectDNS = ") {
             "detectDNS = false".into()
         } else if line.starts_with("fallbackDNS = ") {
-            format!("fallbackDNS = \\#router; [{gw}]::53::UDP")
+            format!("fallbackDNS = \\#network; {fallback}")
         } else if line.starts_with("routeIPs =") {
-            format!("routeIPs = {gw}")
+            format!("routeIPs = {route}")
         } else if line.starts_with("routeUnderlyingDNS = ") {
             "routeUnderlyingDNS = true".into()
         } else if line.starts_with("showInitialInfoPopUp = ") {
@@ -377,6 +399,7 @@ pub fn dns_filter(adb: &Adb, sdk: u32, o: &Options) -> Result<Option<usize>, Str
         adb.sh(&format!("appops set {DNSFILTER} ACTIVATE_VPN allow"));
         adb.sh(&format!("dumpsys deviceidle whitelist +{DNSFILTER}"));
         adb.sh(&format!("settings put secure always_on_vpn_app {DNSFILTER}"));
+        start_filter(adb);
         let _ = std::fs::remove_dir_all(&tmp);
         return Ok(Some(hosts.len()));
     }
@@ -432,12 +455,9 @@ pub fn dns_filter(adb: &Adb, sdk: u32, o: &Options) -> Result<Option<usize>, Str
         adb.sh(&format!("settings put secure always_on_vpn_app {DNSFILTER}"));
         return Err("The DNS filter replaced its block list with an empty one. Run Debloat again.".into());
     }
-    if sdk < 28 {
-        // Fire OS 6 forgets always-on at boot; the app's own boot start needs one launch first.
-        adb.sh(&format!("am start -n {DNSFILTER}/.DNSProxyActivity"));
-        thread::sleep(Duration::from_secs(8));
-        adb.sh("input keyevent KEYCODE_HOME");
-    }
+    // Running again at once, not only after the next restart: the filter was stopped above, and
+    // the TV must not be left without it. Fire OS 6 also needs this one launch for its boot start.
+    start_filter(adb);
     let _ = std::fs::remove_dir_all(&tmp);
     Ok(Some(hosts.len()))
 }

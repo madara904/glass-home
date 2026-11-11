@@ -105,7 +105,7 @@ pictures; it is also in [`docs/`](docs/index.html).
 
 | Fire OS | Status |
 |---|---|
-| Fire OS 8 | supported; the DNS filter is built but not yet confirmed on a Fire OS 8 device |
+| Fire OS 8 | supported; the DNS filter is tested on Android TV 11 (the Android under Fire OS 8), not yet on a Fire OS 8 device |
 | Fire OS 7 | supported |
 | Fire OS 6 | supported |
 | Fire OS 5 and older | not supported: packages can't be turned off |
