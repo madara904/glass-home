@@ -97,6 +97,7 @@ const en = {
   look: 'Look',
   glassSymbols: 'Glass symbols',
   originalBanners: 'Original banners',
+  dockArrows: 'Arrows beside the dock',
   update: 'Update',
   install: 'Install',
 
@@ -208,6 +209,7 @@ const de: Dict = {
   look: 'Aussehen',
   glassSymbols: 'Glas-Symbole',
   originalBanners: 'Original-Banner',
+  dockArrows: 'Pfeile am Dock',
   update: 'Aktualisieren',
   install: 'Installieren',
 

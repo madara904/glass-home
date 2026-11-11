@@ -149,7 +149,7 @@ public final class Home extends Activity implements Stage.Host {
     private static final String[] LOOK = {Stage.Prefs.MATERIAL, Stage.Prefs.CONTROLS, Stage.Prefs.FONT,
             Stage.Prefs.NAMES, Stage.Prefs.DATE, Stage.Prefs.AMAZON, Stage.Prefs.LAYOUT, Stage.Prefs.POSITION,
             Stage.Prefs.STYLE, Stage.Prefs.TILES, Stage.Prefs.TEXT, Stage.Prefs.HOME, Stage.Prefs.ICONS,
-            Stage.Prefs.THEME, Stage.Prefs.SLIDE, Stage.Prefs.SLIDE_EVERY, Stage.Prefs.SLIDE_ORDER, Stage.Prefs.SLIDES};
+            Stage.Prefs.THEME, Stage.Prefs.SLIDE, Stage.Prefs.SLIDE_EVERY, Stage.Prefs.SLIDE_ORDER, Stage.Prefs.SLIDES, Stage.Prefs.ARROWS};
     /** The dock the screen shows, to notice one sent from outside. */
     private String lastDock = "";
     /** The settings the screen was last drawn with; the wallpaper comes last. */
@@ -199,6 +199,7 @@ public final class Home extends Activity implements Stage.Host {
         p.material = "frost".equals(m) ? 1 : "clear".equals(m) ? 2 : 0;
         p.controlText = !"icons".equals(cfg.get(Stage.Prefs.CONTROLS, "text"));
         p.namesAlways = "always".equals(cfg.get(Stage.Prefs.NAMES, "focus"));
+        p.arrows = "on".equals(cfg.get(Stage.Prefs.ARROWS, "off"));
         p.showDate = !"off".equals(cfg.get(Stage.Prefs.DATE, "on"));
         p.amazonApps = "all".equals(cfg.get(Stage.Prefs.AMAZON, "few"));
         String lay = cfg.get(Stage.Prefs.LAYOUT, "dock");
