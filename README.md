@@ -64,9 +64,9 @@ Nothing on the TV's system partition changes. **Restore** turns everything back 
 
 | System | File |
 |---|---|
-| Windows | [`Glass Home.exe`](https://github.com/madara904/glass-home/releases/latest) (runs without installing) |
-| macOS (Apple Silicon and Intel) | [`Glass-Home-macOS.zip`](https://github.com/madara904/glass-home/releases/latest) |
-| Android phone (Android 7 or newer) | [`Glass-Home-Android.apk`](https://github.com/madara904/glass-home/releases/latest): install it, allow installing from your browser when asked; the phone must be on the same Wi-Fi as the TV |
+| Windows | [`Glass-Home-Windows.exe`](https://github.com/madara904/glass-home/releases/latest/download/Glass-Home-Windows.exe) (runs without installing) |
+| macOS (Apple Silicon and Intel) | [`Glass-Home-macOS.zip`](https://github.com/madara904/glass-home/releases/latest/download/Glass-Home-macOS.zip) |
+| Android phone (Android 7 or newer) | [`Glass-Home-Android.apk`](https://github.com/madara904/glass-home/releases/latest/download/Glass-Home-Android.apk): install it, allow installing from your browser when asked; the phone must be on the same Wi-Fi as the TV |
 
 The programs are not signed yet, so the first start shows a warning:
 

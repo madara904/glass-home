@@ -1,4 +1,4 @@
-# Builds the desktop tool as programs that run without installing: one Glass Home.exe for
+# Builds the desktop tool as programs that run without installing: one Glass-Home-Windows.exe for
 # Windows, Glass Home.app (Apple Silicon and Intel in one) for macOS, Glass-Home-Android.apk for
 # phones (needs the ANDROID_KEYSTORE and ANDROID_KEYSTORE_PASSWORD secrets). The TV app is built into
 # the program; adb is spoken by the program itself. Every run publishes both files as a GitHub release: started
@@ -40,11 +40,11 @@ jobs:
       - run: pnpm tauri build --no-bundle
       - name: Name the program
         shell: pwsh
-        run: Copy-Item src-tauri/target/release/glass-home-tool.exe "Glass Home.exe"
+        run: Copy-Item src-tauri/target/release/glass-home-tool.exe Glass-Home-Windows.exe
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: Glass-Home-Windows
-          path: tool/Glass Home.exe
+          path: tool/Glass-Home-Windows.exe
           if-no-files-found: error
 
   macos:
@@ -140,6 +140,6 @@ jobs:
           make_latest: true
           overwrite_files: true
           files: |
-            out/Glass Home.exe
+            out/Glass-Home-Windows.exe
             out/Glass-Home-macOS.zip
             out/Glass-Home-Android.apk
