@@ -90,6 +90,7 @@ public final class Home extends Activity implements Stage.Host {
         applied = look();
         photoStamp = photoStamp();
         showApps(Catalog.apps(this));
+        lastDock = cfg.get(DOCK, "");
 
         IntentFilter f = new IntentFilter();
         f.addAction(Intent.ACTION_PACKAGE_ADDED);
@@ -126,6 +127,12 @@ public final class Home extends Activity implements Stage.Host {
         boolean photo = stamp != photoStamp;
         photoStamp = stamp;
         seen = cfg.version();
+        // A dock sent from outside (the tool): the tiles follow it.
+        String dockNow = cfg.get(DOCK, "");
+        if (!dockNow.equals(lastDock)) {
+            lastDock = dockNow;
+            showApps(apps);
+        }
         // Only what changes the look counts: the launcher writes its own bookkeeping (app order,
         // hidden apps) into the same file, and redrawing for that stalled moving on Home.
         String look = look();
@@ -143,6 +150,8 @@ public final class Home extends Activity implements Stage.Host {
             Stage.Prefs.NAMES, Stage.Prefs.DATE, Stage.Prefs.AMAZON, Stage.Prefs.LAYOUT, Stage.Prefs.POSITION,
             Stage.Prefs.STYLE, Stage.Prefs.TILES, Stage.Prefs.TEXT, Stage.Prefs.HOME, Stage.Prefs.ICONS,
             Stage.Prefs.THEME, Stage.Prefs.SLIDE, Stage.Prefs.SLIDE_EVERY, Stage.Prefs.SLIDE_ORDER, Stage.Prefs.SLIDES};
+    /** The dock the screen shows, to notice one sent from outside. */
+    private String lastDock = "";
     /** The settings the screen was last drawn with; the wallpaper comes last. */
     private String applied;
 
@@ -361,6 +370,7 @@ public final class Home extends Activity implements Stage.Host {
         // An empty dock is saved as "-", so it is not mistaken for a first start.
         if (ids.isEmpty()) cfg.set(DOCK, "-");
         else cfg.setList(DOCK, ids);
+        lastDock = cfg.get(DOCK, "");
     }
 
     @Override

@@ -151,10 +151,10 @@ final class Stage extends View {
         p.setShader(new LinearGradient(w, h, 0, 0, new int[] {0xFFDFF4EE, 0xFFE7ECF8, 0xFFE4DEFA},
                 new float[] {0, .5f, 1}, Shader.TileMode.CLAMP));
         c.drawRect(0, 0, w, h, p);
-        blob(c, p, .12f * w, .18f * h, .48f * w, .62f * h, Color.argb(178, 169, 159, 240));
-        blob(c, p, .46f * w, .04f * h, .42f * w, .55f * h, Color.argb(128, 127, 151, 230));
-        blob(c, p, .92f * w, .88f * h, .50f * w, .60f * h, Color.argb(178, 143, 216, 200));
-        blob(c, p, .70f * w, .46f * h, .38f * w, .48f * h, Color.argb(87, 95, 182, 201));
+        blob(c, p, .12f * w, .18f * h, .48f * w, .62f * h, Color.argb(92, 169, 159, 240));
+        blob(c, p, .46f * w, .04f * h, .42f * w, .55f * h, Color.argb(62, 127, 151, 230));
+        blob(c, p, .92f * w, .88f * h, .50f * w, .60f * h, Color.argb(96, 143, 216, 200));
+        blob(c, p, .70f * w, .46f * h, .38f * w, .48f * h, Color.argb(42, 95, 182, 201));
         return b;
     }
 
@@ -565,7 +565,10 @@ final class Stage extends View {
     void setPrefs(Prefs p, boolean fire) {
         prefs = p;
         fireHome = fire;
+        boolean wasLight = lightTheme;
         applyTheme();
+        // Into or out of Lavender from outside (the tool): its colour field replaces the photo, or gives it back.
+        if (wasLight != lightTheme && photo != null) loadWall(wall, false);
         loadFonts();
         geometry();
         slides.clear();
