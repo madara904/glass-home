@@ -156,9 +156,8 @@ pub fn reboot_and_wait(adb: &Adb) -> Result<(), String> {
         adb.sh("reboot");
     }
     thread::sleep(Duration::from_secs(30));
-    let serial = adb.serial();
     for _ in 0..40 {
-        let _ = adb.raw(&["connect", &serial]);
+        adb.forget();
         if adb.sh1("getprop sys.boot_completed") == "1" && adb.sh1("cat /proc/sys/kernel/random/boot_id") != before {
             thread::sleep(Duration::from_secs(8));
             return Ok(());
@@ -218,9 +217,9 @@ pub fn state(adb: &Adb, sdk: u32) -> State {
 }
 
 /// The apps the owner installed, each with the name the TV shows. The name comes from the
-/// app itself (aapt2 reads its pulled APK), never from the package id: a guessed name once
+/// app itself (read from its pulled APK), never from the package id: a guessed name once
 /// cost an owner their IPTV player. Names are cached by APK path, which changes on update.
-pub fn user_apps(adb: &Adb, aapt2: &Path, cache_dir: &Path) -> Vec<App> {
+pub fn user_apps(adb: &Adb, cache_dir: &Path) -> Vec<App> {
     let skip = [GLASS, LEGACY, DNSFILTER];
     let cache_file = cache_dir.join("labels.json");
     let mut cache: HashMap<String, String> =
@@ -238,7 +237,7 @@ pub fn user_apps(adb: &Adb, aapt2: &Path, cache_dir: &Path) -> Vec<App> {
         let label = match cache.get(path) {
             Some(l) => l.clone(),
             None => {
-                let l = read_label(adb, aapt2, cache_dir, path).unwrap_or_else(|| pkg.to_string());
+                let l = read_label(adb, cache_dir, path).unwrap_or_else(|| pkg.to_string());
                 cache.insert(path.to_string(), l.clone());
                 l
             }
@@ -250,20 +249,11 @@ pub fn user_apps(adb: &Adb, aapt2: &Path, cache_dir: &Path) -> Vec<App> {
     out
 }
 
-fn read_label(adb: &Adb, aapt2: &Path, dir: &Path, remote: &str) -> Option<String> {
+/// The app's name from its manifest and resources, as the TV shows it.
+fn read_label(adb: &Adb, dir: &Path, remote: &str) -> Option<String> {
     let local = dir.join("probe.apk");
     adb.pull(remote, &local).ok()?;
-    let mut c = std::process::Command::new(aapt2);
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        c.creation_flags(0x0800_0000);
-    }
-    let out = c.args(["dump", "badging"]).arg(&local).output().ok()?;
+    let label = apk_info::Apk::new(&local).ok().and_then(|a| a.get_application_label());
     let _ = std::fs::remove_file(&local);
-    let text = String::from_utf8_lossy(&out.stdout);
-    let pick = |prefix: &str| {
-        text.lines().find_map(|l| l.strip_prefix(prefix).and_then(|v| v.strip_prefix('\'')).and_then(|v| v.strip_suffix('\'')).map(str::to_string))
-    };
-    pick("application-label-de:").or_else(|| pick("application-label:")).filter(|l| !l.is_empty())
+    label.map(|l| l.trim().to_string()).filter(|l| !l.is_empty())
 }

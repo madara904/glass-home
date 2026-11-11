@@ -444,7 +444,8 @@ fn tap_allow(adb: &Adb) -> bool {
     true
 }
 
-/// Runs `adb restore` and answers the TV's confirmation (dumbtv's restore_app_data). Android
+/// Restores the archive with `bu restore` on the TV (what adbd runs for `adb restore`) and
+/// answers the TV's confirmation (dumbtv's restore_app_data). Android
 /// logs "processing complete" even for a refused request, so success also needs its "taking
 /// data" line and no read error.
 fn restore_into_app(adb: &Adb, sdk: u32, tmp: &Path, conf: &str, list: &str, count: &str) -> Result<(), String> {
@@ -462,18 +463,22 @@ fn restore_into_app(adb: &Adb, sdk: u32, tmp: &Path, conf: &str, list: &str, cou
     let fail0 = restore_count(adb, &["ErrnoException", "timed out waiting for user confirmation"]);
     adb.sh("am force-stop com.android.backupconfirm");
 
-    let serial = adb.serial();
-    let ab_arg = ab.to_string_lossy().to_string();
-    let exe = adb.exe().to_path_buf();
-    let child = thread::spawn(move || {
-        let mut c = std::process::Command::new(exe);
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            c.creation_flags(0x0800_0000);
-        }
-        let _ = c.args(["-s", &serial, "restore", &ab_arg]).output();
+    const REMOTE_AB: &str = "/data/local/tmp/glasshome-appdata.ab";
+    adb.push(&ab, REMOTE_AB)?;
+    // Runs until the restore is confirmed or refused; the steps below watch and answer the TV
+    // meanwhile, on their own connections.
+    let child = thread::scope(|s| {
+        let run = s.spawn(|| adb.sh(&format!("bu restore < {REMOTE_AB}")));
+        let r = answer_restore(adb, &run, (done0, took0, fail0));
+        let _ = run.join();
+        r
     });
+    adb.sh(&format!("rm -f {REMOTE_AB}"));
+    child
+}
+
+/// Waits for the confirmation, presses Allow, and waits for the restore to finish.
+fn answer_restore(adb: &Adb, child: &thread::ScopedJoinHandle<'_, String>, (done0, took0, fail0): (usize, usize, usize)) -> Result<(), String> {
     for _ in 0..40 {
         if confirmation_shown(adb) || child.is_finished() {
             break;

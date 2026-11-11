@@ -7,16 +7,15 @@ in the repository, built into the released programs, or downloaded by the tool a
 
 | What | Where | License | Notes |
 |---|---|---|---|
-| adb (Android platform-tools) | `tool/src-tauri/resources/platform-tools/`, `resources/macos/platform-tools/` | Apache License 2.0 | Google's prebuilt binaries; their notice is in `NOTICE.txt` next to them |
-| aapt2 (Android build-tools) | `tool/src-tauri/resources/aapt2.exe`, `resources/macos/aapt2` | Apache License 2.0 | Google's prebuilt binaries, from the Android Open Source Project |
+| [adb_client](https://github.com/cocool97/adb_client) | Rust crate, compiled in | MIT | speaks adb to the TV over the network, without Google's adb program |
+| [apk-info](https://crates.io/crates/apk-info) | Rust crate, compiled in | MIT or Apache 2.0 | reads an app's name from its APK |
 | Glass Home launcher APK | `tool/src-tauri/resources/glass-home.apk` | MIT, plus the launcher's assets below | built from `launcher/` |
 | dumbtv package and settings lists | `tool/src-tauri/data/` | MIT | [dumbtv](https://github.com/humblemuzzu/dumbtv); `data/LICENSE-dumbtv` |
 | Roboto font | `tool/public/roboto.ttf`, `docs/assets/roboto.ttf` (the guide) | SIL Open Font License 1.1 | by Google; license in `tool/public/OFL-roboto.txt` and `docs/assets/OFL-roboto.txt` |
 | "Sunlit ridges" photo, behind the layout previews | `tool/public/wall.jpg` | [Unsplash License](https://unsplash.com/license) | by Cristina Gottardi ([photo page](https://unsplash.com/photos/wndpWTiDuT0)); same file as the launcher's `wall-ridge.jpg` |
 
-Google distributes adb and aapt2 as part of the Android SDK, under the Android Software
-Development Kit License Agreement; the source code is Apache 2.0 in the Android Open Source
-Project. Other open-source tools ship these binaries the same way.
+The other Rust and npm dependencies are listed in `tool/src-tauri/Cargo.lock` and
+`tool/pnpm-lock.yaml`, each under its own license.
 
 ## The launcher (`launcher/`)
 

@@ -12,7 +12,7 @@ mod steps;
 mod ui;
 
 use adb::Adb;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use steps::Steps;
 use tauri::{AppHandle, Manager, State};
@@ -104,9 +104,8 @@ async fn device_state(ctx: State<'_, Ctx>) -> Res<device::State> {
 async fn user_apps(ctx: State<'_, Ctx>) -> Res<Vec<device::App>> {
     let d = current(&ctx)?;
     let adb = ctx.adb.clone();
-    let aapt2 = aapt2_path(&ctx.resources);
     let cache = device::device_dir(&ctx.data, &d.serial);
-    blocking(move || device::user_apps(&adb, &aapt2, &cache)).await
+    blocking(move || device::user_apps(&adb, &cache)).await
 }
 
 #[tauri::command]
@@ -211,14 +210,7 @@ pub fn discover_cli() {
 /// `--probe <ip>`: connects, prints what the window would show (device, state, apps) and quits.
 /// Reads only; for checking a TV without clicking through the window.
 pub fn probe(ip: &str) {
-    let base = match bundled::unpack(&std::env::temp_dir().join("glasshome-cli")) {
-        Ok(b) => b,
-        Err(e) => {
-            eprintln!("could not unpack adb: {e}");
-            return Default::default();
-        }
-    };
-    let adb = Adb::new(adb_path(&base));
+    let adb = Adb::new(adb::key_path(&cli_data()));
     if let Err(e) = adb.connect(ip) {
         eprintln!("{e}");
         return;
@@ -231,19 +223,12 @@ pub fn probe(ip: &str) {
     println!("{}", serde_json::to_string_pretty(&device::state(&adb, d.sdk)).unwrap_or_default());
     let cache = std::env::temp_dir().join("glasshome-probe");
     let _ = std::fs::create_dir_all(&cache);
-    println!("{}", serde_json::to_string_pretty(&device::user_apps(&adb, &aapt2_path(&base), &cache)).unwrap_or_default());
+    println!("{}", serde_json::to_string_pretty(&device::user_apps(&adb, &cache)).unwrap_or_default());
 }
 
 /// `--wallpaper <ip> <photo.jpg> [scheme]`: the window's own-photo upload, from the command line.
 pub fn wallpaper_cli(ip: &str, photo: &str, theme: &str) -> bool {
-    let base = match bundled::unpack(&std::env::temp_dir().join("glasshome-cli")) {
-        Ok(b) => b,
-        Err(e) => {
-            eprintln!("could not unpack adb: {e}");
-            return false;
-        }
-    };
-    let adb = Adb::new(adb_path(&base));
+    let adb = Adb::new(adb::key_path(&cli_data()));
     if let Err(e) = adb.connect(ip) {
         eprintln!("{e}");
         return false;
@@ -274,11 +259,11 @@ pub fn run_cli(task: &str, ip: &str, data: Option<&str>) -> bool {
     let base = match bundled::unpack(&std::env::temp_dir().join("glasshome-cli")) {
         Ok(b) => b,
         Err(e) => {
-            eprintln!("could not unpack adb: {e}");
+            eprintln!("could not unpack the launcher: {e}");
             return Default::default();
         }
     };
-    let adb = Adb::new(adb_path(&base));
+    let adb = Adb::new(adb::key_path(&cli_data()));
     if let Err(e) = adb.connect(ip) {
         eprintln!("{e}");
         return false;
@@ -325,11 +310,12 @@ pub fn run() {
                     }
                 }
             }
-            // adb, aapt2 and the APK are inside the program; they are unpacked next to its data.
+            // The launcher APK is inside the program; it is unpacked next to its data. adb is
+            // spoken by the program itself, with a key kept there too.
             let data = app.path().app_data_dir()?;
             std::fs::create_dir_all(&data)?;
             let resources = bundled::unpack(&data)?;
-            let adb = Arc::new(Adb::new(adb_path(&resources)));
+            let adb = Arc::new(Adb::new(adb::key_path(&data)));
             app.manage(Ctx { adb, device: Mutex::new(None), resources, data });
             Ok(())
         })
@@ -340,12 +326,14 @@ pub fn run() {
         .expect("Glass Home could not start");
 }
 
-/// The bundled adb: adb.exe on Windows, adb on macOS.
-fn adb_path(resources: &Path) -> PathBuf {
-    resources.join("platform-tools").join(format!("adb{}", std::env::consts::EXE_SUFFIX))
-}
-
-fn aapt2_path(resources: &Path) -> PathBuf {
-    resources.join(format!("aapt2{}", std::env::consts::EXE_SUFFIX))
+/// Where the command-line modes keep their key: the window's data folder, so a TV that allowed
+/// the window also allows them.
+fn cli_data() -> PathBuf {
+    let base = std::env::var_os(if cfg!(windows) { "APPDATA" } else { "HOME" }).map(PathBuf::from).unwrap_or_else(std::env::temp_dir);
+    if cfg!(target_os = "macos") {
+        base.join("Library/Application Support/app.glasshome.tool")
+    } else {
+        base.join("app.glasshome.tool")
+    }
 }
 

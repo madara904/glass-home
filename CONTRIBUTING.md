@@ -10,8 +10,9 @@ code.
 
 ## Build
 
-The desktop tool needs Rust (stable), Node 22 and pnpm. adb, aapt2 and the launcher APK are
-bundled in `tool/src-tauri/resources`, so you don't need the Android SDK for it.
+The desktop tool needs Rust (stable), Node 22 and pnpm. The tool speaks adb
+itself (the adb_client crate) and bundles the launcher APK from `tool/src-tauri/resources`, so you
+don't need the Android SDK for it.
 
 ```sh
 cd tool

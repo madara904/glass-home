@@ -10,7 +10,8 @@ not in a public issue. We will answer within a few days and agree on a timeline 
 
 Knowing this helps judge whether something is a vulnerability:
 
-- **adb over the network.** The tool connects to the Fire TV on port 5555 with the bundled adb.
+- **adb over the network.** The tool connects to the Fire TV on port 5555; it speaks adb itself
+  (adb_client) and signs in with a key it keeps in its data folder, or adb's own `~/.android/adbkey` when there is one.
   ADB debugging gives full shell access to the TV to anyone on the same network whose computer
   the TV has allowed. Glass Home does not change who is allowed; turn ADB debugging off on the
   TV when you don't need it.
