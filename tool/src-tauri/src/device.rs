@@ -173,8 +173,12 @@ pub const TV_NOTES: &str = "/data/local/tmp/glasshome";
 
 pub fn keep_on_tv(adb: &Adb, local: &Path) {
     let Some(name) = local.file_name().and_then(|n| n.to_str()) else { return };
-    adb.sh(&format!("mkdir -p {TV_NOTES}"));
-    let _ = adb.push(local, &format!("{TV_NOTES}/{name}"));
+    adb.sh(&format!("mkdir -p {TV_NOTES} && chmod 700 {TV_NOTES}"));
+    let remote = format!("{TV_NOTES}/{name}");
+    // The settings listing is this TV's own business: readable by the shell user only, not by apps.
+    if adb.push(local, &remote).is_ok() {
+        adb.sh(&format!("chmod 600 {remote}"));
+    }
 }
 
 /// The note from this device, or else the TV's copy (written to this device for next time).

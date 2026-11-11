@@ -59,7 +59,11 @@ impl<T: ADBMessageTransport> ADBMessageDevice<T> {
 
         self.get_transport_mut().write_message(message)?;
 
-        let message = self.get_transport_mut().read_message()?;
+        // Glass Home patch: a TV still booting accepts the connection but answers late or never;
+        // the handshake gives up after 10 s instead of waiting for the read cap.
+        let message = self
+            .get_transport_mut()
+            .read_message_with_timeout(Duration::from_secs(10))?;
 
         // Check if a client is requesting a secure connection and upgrade it if necessary
         match message.header().command() {
@@ -118,7 +122,7 @@ impl<T: ADBMessageTransport> ADBMessageDevice<T> {
 
         self.transport.write_message(message)?;
 
-        let received_response = self.transport.read_message()?;
+        let received_response = self.transport.read_message_with_timeout(Duration::from_secs(10))?;
 
         if received_response.header().command() == MessageCommand::Cnxn {
             log::info!(
