@@ -38,6 +38,7 @@ pub struct State {
     pub layout: String,
     pub tiles: String,
     pub theme: String,
+    pub arrows: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -212,6 +213,7 @@ pub fn state(adb: &Adb, sdk: u32) -> State {
         layout: conf.get("glass.layout").cloned().unwrap_or_else(|| "dock".into()),
         tiles: if conf.get("glass.icons").map(String::as_str) == Some("glass") { "glass".into() } else { "original".into() },
         theme: conf.get("glass.theme").filter(|t| crate::ui::THEMES.contains(&t.as_str())).cloned().unwrap_or_else(|| "neutral".into()),
+        arrows: conf.get("glass.arrows").map(String::as_str) == Some("on"),
     }
 }
 

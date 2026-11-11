@@ -64,7 +64,7 @@ final class Stage extends View {
                 POSITION = "glass.position", STYLE = "glass.style", TILES = "glass.tiles", TEXT = "glass.text",
                 HOME = "glass.home", ICONS = "glass.icons", THEME = "glass.theme",
                 SLIDE = "glass.slide", SLIDE_EVERY = "glass.slide.every", SLIDE_ORDER = "glass.slide.order",
-                SLIDES = "glass.slides";
+                SLIDES = "glass.slides", ARROWS = "glass.arrows";
         /** Slideshow: on or off, minutes between photos (index into EVERY), shuffled or in order, and its photos. */
         boolean slideOn, slideShuffle;
         int slideEvery = 1;
@@ -88,6 +88,8 @@ final class Stage extends View {
         /** 0 Geist, 1 Newsreader, 2 the system face. */
         int font;
         boolean controlText = true, namesAlways, showDate = true, amazonApps;
+        /** Chevrons beside the dock where more tiles are; off unless chosen. */
+        boolean arrows;
     }
 
     static final int HOME = 0, ARRANGE = 1, APPS = 2, WALLS = 3, SETTINGS = 4, MENU = 5, APPS_MOVE = 6;
@@ -300,6 +302,10 @@ final class Stage extends View {
     private final Tween rowY = new Tween(0), listOff = new Tween(0), menuY = new Tween(0);
     // Icons layout: the focused app's name on the right, cross-faded when focus moves.
     private final Tween heroFade = new Tween(1);
+    /** The dock's chevrons: 1 while more tiles wait on that side. */
+    private final Tween moreL = new Tween(0), moreR = new Tween(0);
+    private final Path chevron = new Path();
+    private static final int MORE_MS = 280;
     private String heroId, heroPrev;
     /** How visible the outgoing name was when it started to fade (a fast second press lands mid-fade). */
     private float heroPrevA = 1;
@@ -450,10 +456,17 @@ final class Stage extends View {
      * lays a smoky base under it first, so glass stays visible over a bright photograph.
      */
     private void pane(Canvas c, float w, float h, float r, float strength, float alpha, float dark) {
+        pane(c, w, h, r, strength, alpha, dark, 0, w);
+    }
+
+    /** The part of a pane between {@code x0} and {@code x1}, with its own round corners. */
+    private void pane(Canvas c, float w, float h, float r, float strength, float alpha, float dark, float x0, float x1) {
+        boolean whole = x0 <= 0 && x1 >= w;
+        float rr = Math.min(r, (x1 - x0) / 2);
         if (dark > 0 && !lightTheme) {
             glass.setShader(null);
             glass.setColor(Color.argb(Math.round(dark * alpha * 255), 8, 10, 14));
-            c.drawRoundRect(0, 0, w, h, r, r, glass);
+            c.drawRoundRect(x0, 0, x1, h, rr, rr, glass);
         }
         // Steps of 1/24: a focus animation then reuses a few cached gradients instead of a new one per frame.
         float s = Math.round(Math.max(0, Math.min(1, strength)) * 24) / 24f;
@@ -464,10 +477,13 @@ final class Stage extends View {
             glass.setShader(glassShader(w, h, .20f + .30f * s, .08f + .24f * s, .12f + .26f * s, glassColour(s)));
         }
         glass.setAlpha(Math.round(alpha * 255));
-        c.drawRoundRect(0, 0, w, h, r, r, glass);
+        c.drawRoundRect(x0, 0, x1, h, rr, rr, glass);
         glass.setShader(null);
-        glass.setColor(white((.26f + .16f * s) * alpha));
-        c.drawPath(edge(w, h, r), glass);
+        // The rim is cached per size; a tile sliding past the edge changes width every frame.
+        if (whole) {
+            glass.setColor(white((.26f + .16f * s) * alpha));
+            c.drawPath(edge(w, h, r), glass);
+        }
     }
 
     private void softShadow(Canvas c, float w, float h, float r, float strength) {
@@ -869,6 +885,8 @@ final class Stage extends View {
         float step = listLayout(mode) ? rowPitch() : pitch;
         track.go(first * step, ms);
         focus.go(i * step, ms);
+        moreL.go(first > 0 ? 1 : 0, animate ? MORE_MS : 0);
+        moreR.go(first + v < n ? 1 : 0, animate ? MORE_MS : 0);
         focusAlpha.go(inCtl && mode == HOME ? 0 : 1, animate ? FADE_MS : 0);
         ctlAlpha.go(inCtl && mode == HOME ? 1 : 0, animate ? FADE_MS : 0);
         ctlPos.go(ctlI, ms);
@@ -888,7 +906,8 @@ final class Stage extends View {
     private boolean animating() {
         return focus.running() || focusAlpha.running() || track.running() || ctlPos.running()
                 || ctlAlpha.running() || gx.running() || gy.running() || gScroll.running() || rowY.running()
-                || listOff.running() || menuY.running() || heroFade.running() || status != null || sliding
+                || listOff.running() || menuY.running() || heroFade.running() || moreL.running() || moreR.running()
+                || status != null || sliding
                 || hintShowing();
     }
 
@@ -1127,7 +1146,9 @@ final class Stage extends View {
         int from = Math.max(0, (int) (off / pitch) - 1), to = Math.min(n, from + vis + 2);
         c.save();
         // Room for a lifted tile at the ends; the next tile (one gap further) stays hidden.
-        c.clipRect(cx0 - Math.min(18, gap / 2f), 0, cx0 + content + Math.min(18, gap / 2f), H);
+        cardL = cx0 - Math.min(18, gap / 2f);
+        cardR = cx0 + content + Math.min(18, gap / 2f);
+        c.clipRect(cardL, 0, cardR, H);
         int lifted = -1;
         float best = 0;
         for (int i = from; i < to; i++) {
@@ -1153,6 +1174,8 @@ final class Stage extends View {
                 }
             }
         }
+        cardL = -1e9f;
+        cardR = 1e9f;
         c.restore();
 
         if (m != ARRANGE) {
@@ -1174,6 +1197,40 @@ final class Stage extends View {
             }
         }
         if (m == ARRANGE) drawRemove(c, left0 + dockI * pitch + tw / 2f, y + dockH + 20);
+        if (prefs.arrows) {
+            float edge = Math.max(52, cx0 - pad - 70);
+            drawChevron(c, edge, y + dockH / 2f, -1, moreL.get());
+            drawChevron(c, W - edge, y + dockH / 2f, 1, moreR.get());
+        }
+    }
+
+    /** A thin chevron pointing to where more tiles are; it slides in from the dock as it appears. */
+    private void drawChevron(Canvas c, float cx, float cy, int dir, float a) {
+        if (a < .01f) return;
+        float x = cx - dir * 12 * (1 - a), w = 10, h = 20;
+        chevron.rewind();
+        chevron.moveTo(x - dir * w, cy - h);
+        chevron.lineTo(x + dir * w, cy);
+        chevron.lineTo(x - dir * w, cy + h);
+        fill.setStyle(Paint.Style.STROKE);
+        fill.setStrokeWidth(4.5f);
+        fill.setStrokeCap(Paint.Cap.ROUND);
+        fill.setStrokeJoin(Paint.Join.ROUND);
+        // A drawn shadow instead of a blurred one: the same path, offset and dark.
+        if (!lightTheme) {
+            c.save();
+            c.translate(0, 2.5f);
+            fill.setColor(Color.BLACK);
+            fill.setAlpha(Math.round(a * 70));
+            c.drawPath(chevron, fill);
+            c.restore();
+        }
+        fill.setColor(INK);
+        fill.setAlpha(Math.round(a * 225));
+        c.drawPath(chevron, fill);
+        fill.setStyle(Paint.Style.FILL);
+        fill.setStrokeJoin(Paint.Join.MITER);
+        fill.setAlpha(255);
     }
 
     /** CleanFrame's List layout: a column of apps on the left, each a small banner and its name. */
@@ -1382,27 +1439,39 @@ final class Stage extends View {
      * One tile: the card, lifted by {@code e} (0 resting, 1 focused) with a soft shadow and a
      * diagonal sheen. {@code extra} lifts it further (a tile picked up to move).
      */
+    /** The dock's window while its tiles are drawn; tiles crossing it get round corners at the cut. */
+    private float cardL = -1e9f, cardR = 1e9f;
+
     private void drawCard(Canvas c, Card card, String name, float x, float y, float w, float h,
             float e, float extra, float dim) {
         float s = 1 + (LIFT - 1) * e + .03f * extra, lift = 6 * e + 8 * extra;
+        // The part inside the dock's window, in the tile's own coordinates.
+        float x0 = 0, x1 = w;
+        if (cardL > -1e8f) {
+            x0 = Math.max(0, (cardL - x - w / 2) / s + w / 2);
+            x1 = Math.min(w, (cardR - x - w / 2) / s + w / 2);
+            if (x1 - x0 < 1) return;
+        }
+        boolean cut = x0 > 0 || x1 < w;
         c.save();
         c.translate(x + w / 2, y + h / 2 - lift);
         c.scale(s, s);
         c.translate(-w / 2, -h / 2);
-        float r = 18 * (w / 300f);
+        float r = 18 * (w / 300f), rr = Math.min(r, (x1 - x0) / 2);
         if (e > .01f) {
             shadow.setColor(Color.argb(1, 0, 0, 0));
             shadow.setShadowLayer(34 * e, 0, 20 * e, Color.argb(Math.round(150 * e * dim), 0, 0, 0));
-            c.drawRoundRect(2, 4, w - 2, h - 2, r, r, shadow);
+            c.drawRoundRect(x0 + 2, 4, x1 - 2, h - 2, rr, rr, shadow);
             shadow.clearShadowLayer();
         }
-        if (card == null || !card.opaque) pane(c, w, h, r, .2f + .5f * e, dim, .12f);
+        if (card == null || !card.opaque) pane(c, w, h, r, .2f + .5f * e, dim, .12f, x0, x1);
+        if (cut) c.clipRect(x0, 0, x1, h);
         if (card != null) {
             matrix.setScale(w / CARD_W, h / CARD_H);
             card.shader.setLocalMatrix(matrix);
             image.setShader(card.shader);
             image.setAlpha(Math.round(255 * dim));
-            c.drawRoundRect(0, 0, w, h, r, r, image);
+            c.drawRoundRect(x0, 0, x1, h, rr, rr, image);
             image.setShader(null);
             image.setAlpha(255);
         } else if (w > 160) {
@@ -1416,7 +1485,7 @@ final class Stage extends View {
         if (e > .01f) {
             sheen.setShader(sheenShader(w, h));
             sheen.setAlpha(Math.round(255 * e));
-            c.drawRoundRect(0, 0, w, h, r, r, sheen);
+            c.drawRoundRect(x0, 0, x1, h, rr, rr, sheen);
         }
         c.restore();
     }
@@ -1530,8 +1599,8 @@ final class Stage extends View {
     // Background (photo, colours, slideshow) · Layout · Display · Apps · Fire TV.
     private static final int R_WALL = 0, R_THEME = 1, R_SLIDE = 2, R_SLIDE_EVERY = 3, R_SLIDE_ORDER = 4,
             R_LAYOUT = 5, R_POSITION = 6, R_STYLE = 7, R_TILES = 8, R_ICONS = 9, R_GLASS = 10,
-            R_CONTROLS = 11, R_NAMES = 12, R_CLOCK = 13, R_FONT = 14, R_TEXT = 15,
-            R_DOCK = 16, R_AMAZON = 17, R_FIREHOME = 18, R_FIRE = 19, SET_ROWS = 24;
+            R_CONTROLS = 11, R_NAMES = 12, R_ARROWS = 13, R_CLOCK = 14, R_FONT = 15, R_TEXT = 16,
+            R_DOCK = 17, R_AMAZON = 18, R_FIREHOME = 19, R_FIRE = 20, SET_ROWS = 25;
     /** First row of each section. */
     private static final int[] SECTIONS = {R_WALL, R_LAYOUT, R_CONTROLS, R_DOCK, R_FIREHOME};
     private static int setIcon(int i) {
@@ -1549,6 +1618,7 @@ final class Stage extends View {
             case R_GLASS: return R.drawable.ic_s_glass;
             case R_CONTROLS: return R.drawable.ic_s_buttons;
             case R_NAMES: return R.drawable.ic_s_names;
+            case R_ARROWS: return R.drawable.ic_s_arrows;
             case R_CLOCK: return R.drawable.ic_s_clock;
             case R_FONT: return R.drawable.ic_s_font;
             case R_TEXT: return R.drawable.ic_s_size;
@@ -1588,6 +1658,7 @@ final class Stage extends View {
             case R_GLASS: return t("Glas", "Glass");
             case R_CONTROLS: return t("Knöpfe oben", "Top buttons");
             case R_NAMES: return t("App-Namen", "App names");
+            case R_ARROWS: return t("Pfeile am Dock", "Dock arrows");
             case R_CLOCK: return t("Uhr", "Clock");
             case R_FONT: return t("Schriftart", "Typeface");
             case R_TEXT: return t("Schriftgröße", "Text size");
@@ -1637,6 +1708,7 @@ final class Stage extends View {
             case R_GLASS: return prefs.material == 1 ? "Frost" : prefs.material == 2 ? t("Klar", "Clear") : t("Weich", "Soft");
             case R_CONTROLS: return prefs.controlText ? t("Symbol und Name", "Icon and name") : t("Nur Symbol", "Icon only");
             case R_NAMES: return prefs.namesAlways ? t("Immer", "Always") : t("Nur bei Fokus", "Focused only");
+            case R_ARROWS: return prefs.arrows ? t("An", "On") : t("Aus", "Off");
             case R_CLOCK: return prefs.showDate ? t("Mit Datum", "With date") : t("Nur Uhrzeit", "Time only");
             case R_FONT: return prefs.font == 1 ? "Newsreader" : prefs.font == 2 ? "System" : "Geist";
             case R_TEXT: return prefs.text == 0 ? t("Klein", "Small") : prefs.text == 2 ? t("Groß", "Large") : "Normal";
@@ -1675,6 +1747,8 @@ final class Stage extends View {
                     "The top right buttons with their names, or icons only.");
             case R_NAMES: return t("Der Name unter einer Dock-Kachel: nur bei der fokussierten oder bei allen.",
                     "The name under a dock tile: for the focused one only, or for all.");
+            case R_ARROWS: return t("Kleine Pfeile links und rechts vom Dock, wenn dort weitere Apps kommen.",
+                    "Small arrows beside the dock when more apps are on that side.");
             case R_CLOCK: return t("Die Uhrzeit oben links, mit oder ohne Datum.",
                     "The time at the top left, with or without the date.");
             case R_FONT: return t("Geist ist eine klare Grotesk, Newsreader eine ruhige Serifenschrift, System die Schrift von Fire TV.",
@@ -2188,6 +2262,10 @@ final class Stage extends View {
             case R_NAMES:
                 prefs.namesAlways = !prefs.namesAlways;
                 host.prefChanged(Prefs.NAMES, prefs.namesAlways ? "always" : "focus");
+                break;
+            case R_ARROWS:
+                prefs.arrows = !prefs.arrows;
+                host.prefChanged(Prefs.ARROWS, prefs.arrows ? "on" : "off");
                 break;
             case R_CLOCK:
                 prefs.showDate = !prefs.showDate;

@@ -19,6 +19,9 @@ pub struct Options {
     /// Colour scheme: neutral, auto, mint, sand or lavender; empty keeps what the TV has.
     #[serde(default)]
     pub theme: String,
+    /// Chevrons beside the dock where more apps are (glass.arrows).
+    #[serde(default)]
+    pub arrows: bool,
 }
 
 /// The launcher's colour schemes (Stage.Prefs.THEMES), as stored in glass.theme.
@@ -73,6 +76,7 @@ pub fn run(adb: &Adb, sdk: u32, apk: &Path, o: &Options, s: &mut Steps) -> bool 
     if THEMES.contains(&o.theme.as_str()) {
         set(&mut conf, "glass.theme", o.theme.as_str());
     }
+    set(&mut conf, "glass.arrows", if o.arrows { "on" } else { "off" });
     let text = conf.iter().map(|(k, v)| format!("{k}={v}")).collect::<Vec<_>>().join("\n") + "\n";
     let local = std::env::temp_dir().join(format!("glasshome-conf-{}.txt", std::process::id()));
     let pushed = std::fs::write(&local, text).map_err(|e| e.to_string()).and_then(|_| adb.push(&local, &device::config_path(sdk, GLASS)));

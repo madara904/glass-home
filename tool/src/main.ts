@@ -288,7 +288,7 @@ async function tvPhoto(f: File): Promise<{ jpeg: Uint8Array; thumb: string }> {
 }
 
 function uiPanel() {
-  const o: UiOptions = { layout: state?.layout ?? 'dock', tiles: state?.tiles ?? 'original', theme: state?.theme ?? 'neutral' };
+  const o: UiOptions = { layout: state?.layout ?? 'dock', tiles: state?.tiles ?? 'original', theme: state?.theme ?? 'neutral', arrows: state?.arrows ?? false };
   const thumbs: Record<UiOptions['layout'], string> = {
     dock: '<i class="g" style="left:14%;right:14%;bottom:9px;height:20px"></i><i style="left:20%;bottom:13px;width:14%;height:12px"></i><i style="left:37%;bottom:13px;width:14%;height:12px"></i><i style="left:54%;bottom:13px;width:14%;height:12px"></i>',
     list: '<i class="g" style="left:9px;top:10px;width:58%;height:15px"></i><i style="left:13px;top:13px;width:14px;height:9px"></i><i style="left:13px;top:31px;width:14px;height:9px;opacity:.6"></i><i style="left:13px;top:49px;width:14px;height:9px;opacity:.6"></i>',
@@ -315,6 +315,7 @@ function uiPanel() {
       </div>
       <div class="label">${t.tiles}</div>
       ${option('tiles', t.look, tilesLabel())}
+      ${option('arrows', t.dockArrows, o.arrows ? t.on : t.off)}
     </div>
     <footer><button class="quiet" data-act="close">${t.cancel}</button><button class="go" data-act="go">${state?.glassUi ? t.update : t.install}</button></footer>`);
   panel.querySelectorAll<HTMLElement>('[data-layout]').forEach((b) => b.addEventListener('click', () => {
@@ -359,6 +360,10 @@ function uiPanel() {
   panel.querySelector('[data-opt=tiles]')!.addEventListener('click', (e) => {
     o.tiles = o.tiles === 'original' ? 'glass' : 'original';
     (e.currentTarget as HTMLElement).querySelector('.value')!.textContent = tilesLabel();
+  });
+  panel.querySelector('[data-opt=arrows]')!.addEventListener('click', (e) => {
+    o.arrows = !o.arrows;
+    (e.currentTarget as HTMLElement).querySelector('.value')!.textContent = o.arrows ? t.on : t.off;
   });
   panel.querySelector('[data-act=go]')!.addEventListener('click', () => run(panel, t.glassUi, (s) => api.installUi(o, s)));
 }
