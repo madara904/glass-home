@@ -78,7 +78,7 @@ h1 { font-size: 56px; line-height: 1.06; font-weight: 500; letter-spacing: -1.1p
 .field input::placeholder { color: var(--faint); }
 .go {
   height: 52px; padding: 0 26px; border-radius: 26px; background: var(--solid); color: var(--solid-ink);
-  font-weight: 550; font-size: 16px; box-shadow: 0 10px 24px -14px rgba(27, 34, 51, .6);
+  font-weight: 550; font-size: 16px;
   transition: transform .18s var(--ease), opacity .15s;
 }
 .go:hover { transform: scale(1.03); }
@@ -363,6 +363,6 @@ h1 { font-size: 48px; line-height: 1.06; letter-spacing: -1.2px; }
 /* ---------- the danger button: a quiet text button, in rose ---------- */
 .quiet.danger { margin-top: 20px; margin-left: -6px; color: var(--warn); }
 .quiet.danger:hover, .quiet.danger:focus-visible { color: #962f53; }
-.go.danger { background: linear-gradient(170deg, #c04f75, #a8365d); color: #fff; box-shadow: 0 12px 26px -14px rgba(168, 54, 93, .75), inset 0 1px 0 rgba(255,255,255,.22); }
+.go.danger { background: linear-gradient(170deg, #c04f75, #a8365d); color: #fff; }
 .panel .step.warn, .panel .step.warn > .ic { color: var(--warn); }
 .panel .step > .ic { width: 16px; height: 16px; flex: none; }
