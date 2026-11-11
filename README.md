@@ -138,6 +138,16 @@ it. You can always type the TV's address instead.
 **Fire OS refused the home screen takeover.**
 Parental controls can block it. Turn them off, run Glass UI, then turn them back on.
 
+**Some apps scroll less smoothly since Glass UI.**
+Fire OS lets no app replace its home screen, so Glass Home takes over the Home button with an
+accessibility service, a system feature meant for helper apps. While any accessibility service
+is on, apps built with Jetpack Compose (1.7 and older) also prepare their content for a screen
+reader such as VoiceView, even though Glass Home never asks for it, and on slow sticks that costs
+frames while lists scroll. Measured on a Fire TV Stick Lite: about four times as many stalled
+frames in one app's rails. The fix belongs in the app: it can skip that work while no screen
+reader runs. If an app you use is affected, you can turn the service off under Settings ›
+Accessibility; the Home button then opens Amazon's home screen again until you run Glass UI.
+
 **How do I undo everything?**
 Connect and choose **Restore**. It brings back Amazon's home screen, turns the packages back on,
 resets the settings saved before the first debloat and removes the DNS filter and Glass Home.

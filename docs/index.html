@@ -343,6 +343,12 @@
           <p>Glass Home only switches packages off and changes settings, the way the TV's own menus could. Nothing
             on the system is deleted, and Restore undoes everything. It sends nothing anywhere: no accounts, no
             tracking. The code is open on GitHub.</p></details>
+        <details class="glass"><summary>An app scrolls less smoothly since Glass UI.</summary>
+          <p>Fire OS lets no app replace its home screen, so Glass Home takes over the Home button with an
+            accessibility service. While any such service is on, some apps (those built with Jetpack Compose)
+            prepare their content for a screen reader as well, even though nothing reads it, and on slow sticks
+            that costs frames while lists scroll. The fix belongs in the app. Until then you can turn the service
+            off under Settings › Accessibility; the Home button then opens Amazon's home screen again.</p></details>
         <details class="glass"><summary>Will Fire OS updates undo it?</summary>
           <p>Updates are kept by default so the TV stays secure. An update can turn a package back on; run Debloat
             again and it is off again.</p></details>
