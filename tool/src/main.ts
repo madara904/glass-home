@@ -187,6 +187,7 @@ function deviceView() {
           <span class="value">${changed ? t.restoreValue : t.nothingToDo}</span>${icon.chevron(18)}</button>
       </div>
       <p class="foot">${t.foot}</p>
+      <button class="quiet danger" data-act="adb-off">${icon.shield(16)}${t.adbOff}</button>
     `);
 }
 
@@ -362,6 +363,36 @@ function uiPanel() {
   panel.querySelector('[data-act=go]')!.addEventListener('click', () => run(panel, t.glassUi, (s) => api.installUi(o, s)));
 }
 
+/** The danger button's dialog: what turning ADB off gives, what keeps working, how to undo it. */
+function adbOffPanel() {
+  const panel = showPanel('adb-off', `
+    <header><h2>${t.adbOffTitle}</h2><p>${t.adbOffSub}</p></header>
+    <div class="body">
+      <div class="step">${icon.check(16)}${t.adbOffKeeps}</div>
+      <div class="step warn">${icon.info(16)}${t.adbOffAfter}</div>
+      <p class="note">${t.adbOffBack}</p>
+      <p class="summary bad" id="adbErr"></p>
+    </div>
+    <footer><button class="quiet" data-act="close">${t.cancel}</button><button class="go danger" data-act="go">${t.adbOffGo}</button></footer>`);
+  const go = panel.querySelector<HTMLButtonElement>('[data-act=go]')!;
+  go.addEventListener('click', async () => {
+    go.disabled = true;
+    go.textContent = t.adbOffBusy;
+    try {
+      await api.adbOff();
+      device = null;
+      state = null;
+      open = null;
+      connectView(t.adbOffDone, false);
+      document.getElementById('err')?.classList.add('calm');
+    } catch (e) {
+      panel.querySelector('#adbErr')!.textContent = tr(String(e));
+      go.disabled = false;
+      go.textContent = t.adbOffGo;
+    }
+  });
+}
+
 function restorePanel() {
   const line = (s: string) => `<div class="step">${icon.chevron(16)}${s}</div>`;
   const panel = showPanel('restore', `
@@ -429,6 +460,7 @@ root.addEventListener('click', (e) => {
     case 'debloat': debloatPanel(); break;
     case 'ui': uiPanel(); break;
     case 'restore': restorePanel(); break;
+    case 'adb-off': adbOffPanel(); break;
     case 'close': closePanel(); break;
     case 'done': closePanel(); setTimeout(refresh, 320); break;
   }

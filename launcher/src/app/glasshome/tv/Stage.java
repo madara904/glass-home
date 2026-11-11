@@ -455,7 +455,8 @@ final class Stage extends View {
             glass.setColor(Color.argb(Math.round(dark * alpha * 255), 8, 10, 14));
             c.drawRoundRect(0, 0, w, h, r, r, glass);
         }
-        float s = strength;
+        // Steps of 1/24: a focus animation then reuses a few cached gradients instead of a new one per frame.
+        float s = Math.round(Math.max(0, Math.min(1, strength)) * 24) / 24f;
         if (lightTheme) {
             // Frosted white on the light field: denser at rest, nearly solid in focus.
             glass.setShader(glassShader(w, h, .50f + .46f * s, .30f + .50f * s, .40f + .50f * s));
@@ -587,6 +588,12 @@ final class Stage extends View {
     void setWall(int i) {
         wall = i;
         loadWall(i, true);
+    }
+
+    /** A wallpaper change while HOME is showing: decoded in the background, swapped in when ready. */
+    void changeWall(int i) {
+        wall = i;
+        loadWall(i, false);
     }
 
     private void loadWall(int i, boolean now) {

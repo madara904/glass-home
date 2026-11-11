@@ -132,6 +132,8 @@ export const api = {
   installUi: (o: UiOptions, onStep: (s: Step) => void) =>
     inTauri ? runTask('run_install_ui', { options: o }, onStep)
       : mockRun(['Install Glass Home', 'Take over the home screen', 'Apply layout', 'Check'], onStep),
+  /** Turns ADB debugging off on the TV; the connection ends with it. */
+  adbOff: (): Promise<void> => (inTauri ? invoke<void>('adb_off') : wait(1500).then(() => undefined)),
   restore: (onStep: (s: Step) => void) =>
     inTauri ? runTask('run_restore', {}, onStep)
       : mockRun(["Bring back Amazon's home screen", 'Turn packages back on', 'Reset settings',

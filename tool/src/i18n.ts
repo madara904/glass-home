@@ -52,6 +52,15 @@ const en = {
   restoreValue: 'Amazon as shipped',
   nothingToDo: 'Nothing to do',
   foot: 'Nothing in the system itself changes. Everything can be restored.',
+  adbOff: 'Turn off ADB debugging',
+  adbOffTitle: 'Turn off ADB debugging?',
+  adbOffSub: 'Recommended once you are done: nobody on your network can control this Fire TV over ADB any more.',
+  adbOffKeeps: 'Glass Home, your colours, photos and the DNS filter keep working.',
+  adbOffAfter: 'This window can’t reach the TV afterwards.',
+  adbOffBack: 'To restore, update or debloat later, turn it back on at the TV yourself: Settings › My Fire TV › Developer options › ADB debugging.',
+  adbOffGo: 'Turn off',
+  adbOffBusy: 'Turning off…',
+  adbOffDone: 'ADB debugging is off on the Fire TV. Turn it back on at the TV when you need this window again.',
 
   debloatSub: 'What stays. Everything else of Amazon’s ads and tracking goes off.',
   keep: 'Keep',
@@ -154,6 +163,15 @@ const de: Dict = {
   restoreValue: 'Wie von Amazon',
   nothingToDo: 'Nichts zu tun',
   foot: 'Am System selbst ändert sich nichts. Alles lässt sich wiederherstellen.',
+  adbOff: 'ADB-Debugging ausschalten',
+  adbOffTitle: 'ADB-Debugging ausschalten?',
+  adbOffSub: 'Empfohlen, wenn du fertig bist: Niemand in deinem Netzwerk kann diesen Fire TV dann noch über ADB steuern.',
+  adbOffKeeps: 'Glass Home, deine Farben, Fotos und der DNS-Filter laufen weiter.',
+  adbOffAfter: 'Dieses Fenster erreicht den TV danach nicht mehr.',
+  adbOffBack: 'Für Wiederherstellen, Updates oder Debloat später am TV selbst wieder einschalten: Einstellungen › Mein Fire TV › Entwickleroptionen › ADB-Debugging.',
+  adbOffGo: 'Ausschalten',
+  adbOffBusy: 'Wird ausgeschaltet…',
+  adbOffDone: 'ADB-Debugging ist am Fire TV aus. Am TV wieder einschalten, wenn du dieses Fenster wieder brauchst.',
 
   debloatSub: 'Was bleiben soll. Alles andere an Werbung und Tracking von Amazon geht aus.',
   keep: 'Behalten',
@@ -208,6 +226,7 @@ const de: Dict = {
 
 // What the backend says, in German. Exact texts first, then texts with numbers or names.
 const backendDe: Record<string, string> = {
+  'The Fire TV still answers over ADB. Turn ADB debugging off on the TV: Settings › My Fire TV › Developer options.': 'Der Fire TV antwortet noch über ADB. ADB-Debugging am TV ausschalten: Einstellungen › Mein Fire TV › Entwickleroptionen.',
   'That photo could not be read. Pick a JPEG, PNG or WebP picture.': 'Das Foto ließ sich nicht lesen. Bitte ein JPEG-, PNG- oder WebP-Bild wählen.',
   'Glass Home is not on this Fire TV yet. Install Glass UI first.': 'Glass Home ist noch nicht auf diesem Fire TV. Zuerst Glass UI installieren.',
   'Back up settings': 'Einstellungen sichern',

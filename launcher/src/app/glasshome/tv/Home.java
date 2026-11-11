@@ -87,6 +87,7 @@ public final class Home extends Activity implements Stage.Host {
         stage.setPrefs(prefs(), fireHome());
         stage.setWall(wallIndex());
         seen = cfg.version();
+        applied = look();
         photoStamp = photoStamp();
         showApps(Catalog.apps(this));
 
@@ -124,13 +125,31 @@ public final class Home extends Activity implements Stage.Host {
         long stamp = photoStamp();
         boolean photo = stamp != photoStamp;
         photoStamp = stamp;
-        if (cfg.version() != seen) {
-            seen = cfg.version();
+        seen = cfg.version();
+        // Only what changes the look counts: the launcher writes its own bookkeeping (app order,
+        // hidden apps) into the same file, and redrawing for that stalled moving on Home.
+        String look = look();
+        if (!look.equals(applied)) {
+            String wallBefore = applied == null ? "" : applied.substring(applied.lastIndexOf('|') + 1);
+            applied = look;
             stage.setPrefs(prefs(), fireHome());
-            stage.setWall(wallIndex());
+            if (!wallBefore.equals(cfg.get(WALL, ""))) stage.changeWall(wallIndex());
         } else if (photo) {
             stage.customPhotoChanged();
         }
+    }
+
+    private static final String[] LOOK = {Stage.Prefs.MATERIAL, Stage.Prefs.CONTROLS, Stage.Prefs.FONT,
+            Stage.Prefs.NAMES, Stage.Prefs.DATE, Stage.Prefs.AMAZON, Stage.Prefs.LAYOUT, Stage.Prefs.POSITION,
+            Stage.Prefs.STYLE, Stage.Prefs.TILES, Stage.Prefs.TEXT, Stage.Prefs.HOME, Stage.Prefs.ICONS,
+            Stage.Prefs.THEME, Stage.Prefs.SLIDE, Stage.Prefs.SLIDE_EVERY, Stage.Prefs.SLIDE_ORDER, Stage.Prefs.SLIDES};
+    /** The settings the screen was last drawn with; the wallpaper comes last. */
+    private String applied;
+
+    private String look() {
+        StringBuilder b = new StringBuilder();
+        for (String k : LOOK) b.append(cfg.get(k, "")).append('|');
+        return b.append(cfg.get(WALL, "")).toString();
     }
 
 /** When the slideshow last changed the photo; it waits a full interval after HOME starts. */
@@ -161,7 +180,8 @@ public final class Home extends Activity implements Stage.Host {
         }
         cfg.set(WALL, next);
         seen = cfg.version();
-        stage.setWall(Walls.index(next));
+        applied = look();
+        stage.changeWall(Walls.index(next));
     }
 
     private Stage.Prefs prefs() {
@@ -347,6 +367,7 @@ public final class Home extends Activity implements Stage.Host {
     public void wallChanged(int wall) {
         cfg.set(WALL, Walls.id(wall));
         seen = cfg.version();
+        applied = look();
         slideAt = android.os.SystemClock.elapsedRealtime();
     }
 
@@ -370,6 +391,7 @@ public final class Home extends Activity implements Stage.Host {
     public void prefChanged(String key, String value) {
         cfg.set(key, value);
         seen = cfg.version();
+        applied = look();
         if (Stage.Prefs.AMAZON.equals(key)) showApps(apps);
     }
 

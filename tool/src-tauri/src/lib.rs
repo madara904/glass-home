@@ -141,6 +141,28 @@ async fn set_wallpaper(image: Vec<u8>, theme: String, ctx: State<'_, Ctx>) -> Re
     blocking(move || ui::send_wallpaper(&adb, &image, &theme)).await?
 }
 
+/// Turns ADB debugging off on the Fire TV, the last thing this window can do with it. The
+/// connection ends with the command; afterwards the TV must no longer answer.
+#[tauri::command]
+async fn adb_off(ctx: State<'_, Ctx>) -> Res<()> {
+    current(&ctx)?;
+    let adb = ctx.adb.clone();
+    let result = blocking(move || -> Res<()> {
+        adb.sh("settings put global adb_enabled 0");
+        std::thread::sleep(std::time::Duration::from_secs(2));
+        let still = adb.alive();
+        adb.disconnect();
+        if still {
+            Err("The Fire TV still answers over ADB. Turn ADB debugging off on the TV: Settings › My Fire TV › Developer options.".into())
+        } else {
+            Ok(())
+        }
+    })
+    .await?;
+    *ctx.device.lock().unwrap() = None;
+    result
+}
+
 #[tauri::command]
 async fn run_restore(app: AppHandle, ctx: State<'_, Ctx>) -> Res<bool> {
     let d = current(&ctx)?;
@@ -312,7 +334,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            discover, connect, disconnect, device_state, user_apps, run_debloat, run_install_ui, run_restore, set_wallpaper, open_github, open_devtools
+            discover, connect, disconnect, device_state, user_apps, run_debloat, run_install_ui, run_restore, adb_off, set_wallpaper, open_github, open_devtools
         ])
         .run(tauri::generate_context!())
         .expect("Glass Home could not start");
