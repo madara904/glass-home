@@ -1,3 +1,4 @@
+import java.io.FileInputStream
 import java.util.Properties
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -14,8 +15,23 @@ val tauriProperties = Properties().apply {
     }
 }
 
+// The release key and its password live in keystore.properties next to settings.gradle,
+// never in git. Without it, release builds come out unsigned.
+val keystoreFile = rootProject.file("keystore.properties")
+val keystore = Properties().apply { if (keystoreFile.exists()) FileInputStream(keystoreFile).use { load(it) } }
+
 android {
     compileSdk = 37
+    if (keystoreFile.exists()) {
+        signingConfigs {
+            create("release") {
+                keyAlias = keystore["keyAlias"] as String
+                keyPassword = keystore["password"] as String
+                storeFile = rootProject.file(keystore["storeFile"] as String)
+                storePassword = keystore["password"] as String
+            }
+        }
+    }
     namespace = "app.glasshome.tool"
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
@@ -39,6 +55,7 @@ android {
             }
         }
         getByName("release") {
+            if (keystoreFile.exists()) signingConfig = signingConfigs.getByName("release")
             optimization {
                enable = true
             }
