@@ -360,13 +360,9 @@ h1 { font-size: 48px; line-height: 1.06; letter-spacing: -1.2px; }
 .photo-prev.has:hover .photo-hover, .photo-prev.has:focus-visible .photo-hover { opacity: 1; }
 .photo-pick .photo-status { margin-top: 0; }
 
-/* ---------- the danger button: a soft rose pill, in the window's own palette ---------- */
-.quiet.danger {
-  margin-top: 22px; padding: 9px 16px 9px 13px; border-radius: 20px; font-weight: 550; color: var(--warn);
-  background: rgba(178, 63, 102, .09); box-shadow: inset 0 0 0 1px rgba(178, 63, 102, .22);
-  transition: background .15s, box-shadow .15s, color .15s;
-}
-.quiet.danger:hover, .quiet.danger:focus-visible { color: #962f53; background: rgba(178, 63, 102, .15); box-shadow: inset 0 0 0 1px rgba(178, 63, 102, .34); }
+/* ---------- the danger button: a quiet text button, in rose ---------- */
+.quiet.danger { margin-top: 20px; margin-left: -6px; color: var(--warn); }
+.quiet.danger:hover, .quiet.danger:focus-visible { color: #962f53; }
 .go.danger { background: linear-gradient(170deg, #c04f75, #a8365d); color: #fff; box-shadow: 0 12px 26px -14px rgba(168, 54, 93, .75), inset 0 1px 0 rgba(255,255,255,.22); }
 .panel .step.warn, .panel .step.warn > .ic { color: var(--warn); }
 .panel .step > .ic { width: 16px; height: 16px; flex: none; }
