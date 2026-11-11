@@ -1,6 +1,6 @@
 [package]
 name = "glass-home-tool"
-version = "0.2.0"
+version = "0.2.1"
 description = "Glass Home: debloat a Fire TV and give it the glass home screen, from the PC"
 license = "MIT"
 repository = "https://github.com/madara904/glass-home"

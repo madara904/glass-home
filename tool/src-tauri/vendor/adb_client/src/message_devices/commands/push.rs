@@ -15,7 +15,8 @@ impl<T: ADBMessageTransport> ADBMessageDevice<T> {
     pub(crate) fn push<R: Read, A: AsRef<str>>(&mut self, stream: R, path: A) -> Result<()> {
         let mut session = self.open_synchronization_session()?;
 
-        let path_header = format!("{},0777", path.as_ref());
+        // Glass Home patch: rw-r--r-- like adb, not world-writable 0777.
+        let path_header = format!("{},0644", path.as_ref());
 
         let send_buffer = MessageSubcommand::Send.with_arg(u32::try_from(path_header.len())?);
         let mut send_buffer = send_buffer.encode();

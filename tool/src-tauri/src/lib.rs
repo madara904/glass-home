@@ -333,6 +333,19 @@ pub fn run_cli(task: &str, ip: &str, data: Option<&str>) -> bool {
     let dir = device::device_dir(&data, &d.serial);
     println!("{} · {} · {}", d.name, d.fire_os, d.serial);
     match task {
+        "filter" => {
+            let o = debloat::Options { keep_prime: true, keep_alexa: true, keep_updates: true, dns_filter: true, remove: vec![] };
+            match debloat::dns_filter(&adb, d.sdk, &o) {
+                Ok(n) => {
+                    println!("done     DNS filter · {} entries", n.unwrap_or(0));
+                    true
+                }
+                Err(e) => {
+                    println!("failed   DNS filter · {e}");
+                    false
+                }
+            }
+        }
         "debloat" => {
             let o = debloat::Options { keep_prime: true, keep_alexa: true, keep_updates: true, dns_filter: true, remove: vec![] };
             debloat::run(&adb, d.sdk, &dir, &o, &mut debloat_steps(None))

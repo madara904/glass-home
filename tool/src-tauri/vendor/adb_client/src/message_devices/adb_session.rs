@@ -131,8 +131,13 @@ impl<T: ADBMessageTransport> ADBSession<T> {
 
             match reader.read(&mut buffer) {
                 Ok(0) => {
-                    // Currently file mtime is not forwarded
-                    let subcommand_data = MessageSubcommand::Done.with_arg(0);
+                    // Glass Home patch: the file gets the current time. With 0 every file was dated
+                    // 1970, and an app that checks its list's age (personalDNSfilter) replaced it.
+                    let now = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map(|d| u32::try_from(d.as_secs()).unwrap_or(u32::MAX))
+                        .unwrap_or(0);
+                    let subcommand_data = MessageSubcommand::Done.with_arg(now);
 
                     let message = ADBTransportMessage::try_new(
                         MessageCommand::Write,

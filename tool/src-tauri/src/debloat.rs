@@ -227,6 +227,13 @@ pub fn run(adb: &Adb, sdk: u32, dir: &Path, o: &Options, s: &mut Steps) -> bool 
     !s.failed
 }
 
+/// Whether the filter's list on the TV is the one just sent: its download count, and the lines.
+fn list_on_tv(adb: &Adb, hosts: usize) -> bool {
+    let count = adb.sh1(&format!("head -n 1 {FILTER_DIR}/FILTERHOSTS.TXT.DLD_CNT"));
+    let lines: usize = adb.sh1(&format!("grep -vc '^#' {FILTER_DIR}/FILTERHOSTS.TXT")).parse().unwrap_or(0);
+    count == hosts.to_string() && lines >= hosts
+}
+
 /// A settings listing, not an empty or broken answer.
 fn looks_like_settings(text: &str) -> bool {
     text.lines().filter(|l| l.contains('=')).count() >= 5
@@ -267,7 +274,7 @@ fn is_domain(s: &str) -> bool {
 
 /// personalDNSfilter as an always-on VPN that answers only for the listed hosts. Returns the
 /// number of entries (an Option so a later TV generation can report "not here").
-fn dns_filter(adb: &Adb, sdk: u32, o: &Options) -> Result<Option<usize>, String> {
+pub fn dns_filter(adb: &Adb, sdk: u32, o: &Options) -> Result<Option<usize>, String> {
     let gw = device::gateway(adb);
     if gw.is_empty() {
         return Err("Could not read the Fire TV's router address.".into());
@@ -374,20 +381,26 @@ fn dns_filter(adb: &Adb, sdk: u32, o: &Options) -> Result<Option<usize>, String>
         return Ok(Some(hosts.len()));
     }
 
-    // First start creates its folder; then it is stopped so it cannot write its defaults over ours.
-    adb.sh(&format!("am start -n {DNSFILTER}/.DNSProxyActivity"));
-    let mut ready = false;
-    for _ in 0..8 {
-        if adb.sh1(&format!("test -d {FILTER_DIR} && echo yes")) == "yes" {
-            ready = true;
-            break;
-        }
-        thread::sleep(Duration::from_secs(3));
-    }
-    if !ready {
-        return Err("The DNS filter did not create its folder.".into());
-    }
+    // A running filter must be out of the way first: Android restarts an always-on VPN app right
+    // after a force-stop, and the running app then wrote an empty "download" over the new list.
+    adb.sh("settings delete secure always_on_vpn_app");
     adb.sh(&format!("am force-stop {DNSFILTER}"));
+    // Its first start creates its folder; only needed on a fresh install.
+    if adb.sh1(&format!("test -d {FILTER_DIR} && echo yes")) != "yes" {
+        adb.sh(&format!("am start -n {DNSFILTER}/.DNSProxyActivity"));
+        let mut ready = false;
+        for _ in 0..8 {
+            if adb.sh1(&format!("test -d {FILTER_DIR} && echo yes")) == "yes" {
+                ready = true;
+                break;
+            }
+            thread::sleep(Duration::from_secs(3));
+        }
+        if !ready {
+            return Err("The DNS filter did not create its folder.".into());
+        }
+        adb.sh(&format!("am force-stop {DNSFILTER}"));
+    }
     thread::sleep(Duration::from_secs(2));
     let conf_path = tmp.join("dnsfilter.conf");
     let list_path = tmp.join("FILTERHOSTS.TXT");
@@ -395,11 +408,30 @@ fn dns_filter(adb: &Adb, sdk: u32, o: &Options) -> Result<Option<usize>, String>
     std::fs::write(&conf_path, patched).map_err(|e| e.to_string())?;
     std::fs::write(&list_path, &list).map_err(|e| e.to_string())?;
     std::fs::write(&count_path, count).map_err(|e| e.to_string())?;
-    adb.push(&conf_path, &format!("{FILTER_DIR}/dnsfilter.conf"))?;
-    adb.sh(&format!("rm -rf {FILTER_DIR}/FILTERHOSTS.TXT.idx; touch {FILTER_DIR}/IDX_OUTDATED"));
-    adb.push(&list_path, &format!("{FILTER_DIR}/FILTERHOSTS.TXT"))?;
-    adb.push(&count_path, &format!("{FILTER_DIR}/FILTERHOSTS.TXT.DLD_CNT"))?;
-    adb.sh(&format!("settings put secure always_on_vpn_app {DNSFILTER}"));
+    // Copied, switched on, and checked twice: right after copying, and once the VPN runs again.
+    let mut placed = false;
+    for _ in 0..2 {
+        adb.sh(&format!("am force-stop {DNSFILTER}"));
+        adb.push(&conf_path, &format!("{FILTER_DIR}/dnsfilter.conf"))?;
+        adb.sh(&format!("rm -rf {FILTER_DIR}/FILTERHOSTS.TXT.idx; touch {FILTER_DIR}/IDX_OUTDATED"));
+        adb.push(&list_path, &format!("{FILTER_DIR}/FILTERHOSTS.TXT"))?;
+        adb.push(&count_path, &format!("{FILTER_DIR}/FILTERHOSTS.TXT.DLD_CNT"))?;
+        if !list_on_tv(adb, hosts.len()) {
+            continue;
+        }
+        adb.sh(&format!("settings put secure always_on_vpn_app {DNSFILTER}"));
+        thread::sleep(Duration::from_secs(8));
+        adb.reconnect();
+        if list_on_tv(adb, hosts.len()) {
+            placed = true;
+            break;
+        }
+        adb.sh("settings delete secure always_on_vpn_app");
+    }
+    if !placed {
+        adb.sh(&format!("settings put secure always_on_vpn_app {DNSFILTER}"));
+        return Err("The DNS filter replaced its block list with an empty one. Run Debloat again.".into());
+    }
     if sdk < 28 {
         // Fire OS 6 forgets always-on at boot; the app's own boot start needs one launch first.
         adb.sh(&format!("am start -n {DNSFILTER}/.DNSProxyActivity"));
