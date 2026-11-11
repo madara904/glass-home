@@ -878,7 +878,8 @@ final class Stage extends View {
     private boolean animating() {
         return focus.running() || focusAlpha.running() || track.running() || ctlPos.running()
                 || ctlAlpha.running() || gx.running() || gy.running() || gScroll.running() || rowY.running()
-                || listOff.running() || menuY.running() || heroFade.running() || status != null || sliding;
+                || listOff.running() || menuY.running() || heroFade.running() || status != null || sliding
+                || hintShowing();
     }
 
     // ---------------------------------------------------------------- drawing
@@ -888,8 +889,12 @@ final class Stage extends View {
         sliding = false;
         c.save();
         c.scale(getWidth() / (float) W, getHeight() / (float) H);
+        hintThisFrame = false;
         drawMode(c, mode == MENU ? menuFrom : mode);
+        // A screen without a tip takes the notice away at once.
+        if (!hintThisFrame) hintText = null;
         if (mode == MENU) drawMenu(c);
+        else drawHint(c);
         drawStatus(c);
         c.restore();
         if (animating()) postInvalidateOnAnimation();
@@ -968,12 +973,8 @@ final class Stage extends View {
         textStyle(medium, 46, -1.2f, INK);
         if (onPhoto) photoShadow(1);
         c.drawText(title, 150, baseline(78, 56), text);
-        if (sub != null) {
-            textStyle(regular, 24, 0, INK);
-            text.setAlpha(onPhoto ? 215 : 185);
-            if (onPhoto) photoShadow(1);
-            c.drawText(sub, 150, baseline(140, 32), text);
-        }
+        // The tip is no line under the title: it shows as a notification at the bottom right.
+        if (sub != null) hint(sub);
         text.clearShadowLayer();
         text.setAlpha(255);
     }
@@ -1866,6 +1867,55 @@ final class Stage extends View {
             textStyle(medium, 27, -.3f, INK);
             c.drawText(menuLabels.get(i), MENU_PAD + 24, baseline(MENU_PAD + MENU_HEAD + i * MENU_ROW, MENU_ROW), text);
         }
+        c.restore();
+    }
+
+/** The screen's tip, shown at the bottom right when the screen opens, then faded. */
+    private String hintText;
+    private int hintMode = -1;
+    private long hintAt;
+    private boolean hintThisFrame;
+    private static final long HINT_MS = 5000, HINT_IN = 240, HINT_OUT = 420;
+
+    private void hint(String s) {
+        hintThisFrame = true;
+        if (s.equals(hintText) && hintMode == mode) return;
+        hintText = s;
+        hintMode = mode;
+        hintAt = SystemClock.uptimeMillis();
+    }
+
+    private boolean hintShowing() {
+        return hintText != null && SystemClock.uptimeMillis() - hintAt < HINT_MS;
+    }
+
+    /** Like Fire TV's own notices: a glass pill at the bottom right, the Menu button's lines first. */
+    private void drawHint(Canvas c) {
+        if (!hintShowing()) return;
+        long age = SystemClock.uptimeMillis() - hintAt;
+        float a = age < HINT_IN ? age / (float) HINT_IN : age > HINT_MS - HINT_OUT ? (HINT_MS - age) / (float) HINT_OUT : 1;
+        a = EASE.getInterpolation(Math.max(0, Math.min(1, a)));
+        textStyle(medium, 22, -.1f, INK);
+        // The Menu button's lines only where the tip is about the Menu button.
+        boolean menuKey = hintText.contains("Men");
+        float lead = menuKey ? 26 + 14 : 0;
+        float tw = text.measureText(hintText), h = 60, w = 28 + lead + tw + 30;
+        float x = W - 150 - w, y = H - 84 - h + 10 * (1 - a);
+        c.save();
+        c.translate(x, y);
+        pane(c, w, h, h / 2, .35f, a, .35f);
+        // The Menu button: three short lines.
+        fill.setColor(INK);
+        fill.setAlpha(Math.round(a * 235));
+        fill.setStyle(Paint.Style.STROKE);
+        fill.setStrokeWidth(2.4f);
+        fill.setStrokeCap(Paint.Cap.ROUND);
+        if (menuKey) for (int i = -1; i <= 1; i++) c.drawLine(28, h / 2 + i * 7, 28 + 22, h / 2 + i * 7, fill);
+        fill.setStyle(Paint.Style.FILL);
+        fill.setAlpha(255);
+        text.setAlpha(Math.round(a * 255));
+        c.drawText(hintText, 28 + lead, baseline(0, h), text);
+        text.setAlpha(255);
         c.restore();
     }
 
