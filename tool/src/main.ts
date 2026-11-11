@@ -57,7 +57,7 @@ function introView() {
         ${step(icon.settings(), t.introAbout, t.introAboutPath)}
         ${step(icon.press(), t.introPress, t.introPressPath)}
         ${step(icon.toggle(), t.introAdb, t.introAdbPath)}
-        ${step(icon.wifi(), t.introWifi, t.introWifiPath)}
+        ${step(icon.wifi(), t.introWifi, isPhone ? t.introWifiPathPhone : t.introWifiPath)}
       </div>
       <div class="below"><button class="go" data-act="intro-done">${t.introGo}</button><span class="aside">${icon.info(16)}${t.introVega}</span></div>
     `);
@@ -92,6 +92,7 @@ function connectView(error = '', search = true) {
   const ip = document.getElementById('ip') as HTMLInputElement;
   ip.addEventListener('keydown', (e) => { if (e.key === 'Enter') connect(ip.value); });
   if (search && !searching) scan();
+  showNotice();
 }
 
 async function connect(ip: string) {
@@ -128,7 +129,8 @@ function foundList(): string {
   const row = (d: Found) => {
     const name = esc(d.name || d.ip);
     const what = d.model || (d.kind === 'fire' ? t.fireTv : d.vendor);
-    const path = `<span class="path">${what ? `${esc(what)} · ` : ''}${esc(d.ip)}</span>`;
+    // Without a name the address is the title; it is not repeated underneath.
+    const path = `<span class="path">${[what ? esc(what) : '', d.name ? esc(d.ip) : ''].filter(Boolean).join(' · ')}</span>`;
     if (d.kind === 'google') {
       return `<button class="row small" disabled>${icon.tv()}<span class="name">${name}${path}</span><span class="value">${t.notFire}</span></button>`;
     }
@@ -310,7 +312,7 @@ function uiPanel() {
         <button class="photo-prev" id="photoPrev" data-act="pick-photo" aria-label="${t.choosePhoto}" title="${t.choosePhoto}">
           <span class="photo-img"></span><span class="photo-hover">${icon.upload(22)}</span>
         </button>
-        <p class="photo-status" id="photoStatus">${t.photoNote}</p>
+        <p class="photo-status" id="photoStatus">${isPhone ? t.photoNotePhone : t.photoNote}</p>
         <input type="file" id="photoFile" accept="image/jpeg,image/png,image/webp" hidden>
       </div>
       <div class="label">${t.tiles}</div>
@@ -513,10 +515,18 @@ async function noteUnfinished() {
   const u = await api.unfinished().catch(() => null);
   if (!u) return;
   const task = u.task === 'debloat' ? t.debloat : u.task === 'ui' ? t.glassUi : t.restore;
+  notice = t.unfinished(task, u.name || u.ip);
+  showNotice();
+}
+
+/** The note about an unfinished task waits for the connect screen (the intro may come first). */
+let notice = '';
+function showNotice() {
   const err = document.getElementById('err');
-  if (!err) return;
-  err.textContent = t.unfinished(task, u.name || u.ip);
+  if (!notice || !err || err.textContent) return;
+  err.textContent = notice;
   err.classList.add('calm');
+  notice = '';
 }
 
 splash(() => {

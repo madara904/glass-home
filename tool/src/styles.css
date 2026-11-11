@@ -392,7 +392,7 @@ h1 { font-size: 48px; line-height: 1.06; letter-spacing: -1.2px; }
 .phone .row > .ic:first-child:not(:last-child) { display: none; }
 .phone .row > .ic:last-child { position: absolute; right: 16px; top: 50%; margin-top: -9px; }
 .phone .row[data-ip] .value { display: none; }
-.phone .row.static { flex-direction: row; align-items: center; padding-right: 18px; }
+.phone .row.static { flex-direction: row; align-items: center; justify-content: flex-start; gap: 16px; padding-right: 18px; }
 .phone .row.static > .ic:first-child { display: block; position: static; margin: 0; }
 .phone .below { margin-top: 10px; flex-wrap: wrap; gap: 6px 14px; }
 .phone .manual { margin-top: 26px; }

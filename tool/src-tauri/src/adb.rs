@@ -110,27 +110,52 @@ impl Adb {
         self.sh1("echo ok") == "ok"
     }
 
+    /// Copies a file to the TV. A transfer cut off by a short outage (a phone between Wi-Fi
+    /// access points) is sent again once the TV answers, for up to ~45 s; copying twice is harmless.
     pub fn push(&self, local: &Path, remote: &str) -> Result<(), String> {
-        self.with(|d| {
-            let mut f = File::open(local)?;
-            d.push(&mut f, &remote)
+        self.patient(|| {
+            self.with(|d| {
+                let mut f = File::open(local)?;
+                d.push(&mut f, &remote)
+            })
         })
         .map_err(|e| format!("Copying to the Fire TV failed: {e}"))
     }
 
     pub fn pull(&self, remote: &str, local: &Path) -> Result<(), String> {
-        self.with(|d| {
-            let mut f = File::create(local)?;
-            d.pull(&remote, &mut f)
+        self.patient(|| {
+            self.with(|d| {
+                let mut f = File::create(local)?;
+                d.pull(&remote, &mut f)
+            })
         })
         .map_err(|e| format!("Reading from the Fire TV failed: {e}"))
+    }
+
+    /// Repeats `op` while the TV is gone, up to ~45 s. Only for operations that may run twice:
+    /// a shell command like `reboot` must not be repeated once the TV is back.
+    fn patient<T>(&self, mut op: impl FnMut() -> Result<T, String>) -> Result<T, String> {
+        let start = Instant::now();
+        loop {
+            match op() {
+                Ok(v) => return Ok(v),
+                Err(e) if start.elapsed() > Duration::from_secs(45) => return Err(e),
+                Err(_) => {
+                    self.forget();
+                    thread::sleep(Duration::from_secs(3));
+                }
+            }
+        }
     }
 
     /// Installs or updates an app: copied to the TV, then `pm install -r`, which every Fire OS
     /// since 5 understands (the streamed `cmd package install` needs Android 7).
     pub fn install(&self, apk: &Path) -> Result<(), String> {
         self.push(apk, TMP_APK)?;
-        let out = self.sh(&format!("pm install -r {TMP_APK}"));
+        // Installing the same file twice is harmless, so a connection lost meanwhile is waited out.
+        let out = self
+            .patient(|| self.try_sh(&format!("pm install -r {TMP_APK}")))
+            .map_err(|_| "Install failed: the connection to the Fire TV was lost.".to_string())?;
         self.sh(&format!("rm -f {TMP_APK}"));
         if out.contains("Success") { Ok(()) } else { Err(format!("Install failed: {}", last_line(&out))) }
     }
@@ -209,15 +234,21 @@ fn home_android() -> Option<PathBuf> {
 
 /// Creates the key when it does not exist yet. adb_client would make a new one for every
 /// connection without saving it, and the TV would ask "Allow USB debugging?" every time.
+/// An empty or broken key (a phone that died while writing it) is replaced: the TV then asks
+/// once more, instead of every connection failing for good.
 fn ensure_key(path: &Path) -> Result<(), String> {
-    if path.is_file() {
-        return Ok(());
+    use rsa::pkcs8::{DecodePrivateKey, EncodePrivateKey, LineEnding};
+    if let Ok(pem) = std::fs::read_to_string(path) {
+        if rsa::RsaPrivateKey::from_pkcs8_pem(&pem).is_ok() {
+            return Ok(());
+        }
     }
-    use rsa::pkcs8::{EncodePrivateKey, LineEnding};
     let key = rsa::RsaPrivateKey::new(&mut rsa::rand_core::OsRng, 2048).map_err(|e| e.to_string())?;
     let pem = key.to_pkcs8_pem(LineEnding::LF).map_err(|e| e.to_string())?;
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     }
-    std::fs::write(path, pem.as_bytes()).map_err(|e| e.to_string())
+    let part = path.with_extension("part");
+    std::fs::write(&part, pem.as_bytes()).map_err(|e| e.to_string())?;
+    std::fs::rename(&part, path).map_err(|e| e.to_string())
 }
