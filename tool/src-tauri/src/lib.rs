@@ -325,7 +325,10 @@ pub fn run_cli(task: &str, ip: &str, data: Option<&str>) -> bool {
         return false;
     }
     let d = device::detect(&adb, ip);
-    if !d.supported {
+    // Debug builds only: GLASSHOME_ANY_DEVICE=1 lets an Android TV emulator through, to try the
+    // Fire OS 8 path (Android 11+) without such a Fire TV.
+    let any = cfg!(debug_assertions) && std::env::var_os("GLASSHOME_ANY_DEVICE").is_some();
+    if !d.supported && !any {
         eprintln!("{}", d.reason.unwrap_or_default());
         return false;
     }
