@@ -55,6 +55,9 @@ pub fn run(adb: &Adb, sdk: u32, apk: &Path, o: &Options, s: &mut Steps) -> bool 
     adb.sh(&format!("dumpsys deviceidle whitelist +{GLASS}"));
     adb.sh(&format!("appops set {GLASS} AUTO_START allow"));
     adb.sh("appops write-settings");
+    // A fresh install runs interpreted until ART has a profile: on a Fire TV Stick Lite the first
+    // move after each start then stalls. Compile it ahead of time, before the restart below.
+    adb.sh(&format!("cmd package compile -m speed -f {GLASS}"));
     s.done("install", device::version(adb, GLASS).map(|v| format!("version {v}")));
 
     // 3. Its settings: one start creates its folder, then the file goes in and the app restarts.
