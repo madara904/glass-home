@@ -366,3 +366,78 @@ h1 { font-size: 48px; line-height: 1.06; letter-spacing: -1.2px; }
 .go.danger { background: linear-gradient(170deg, #c04f75, #a8365d); color: #fff; }
 .panel .step.warn, .panel .step.warn > .ic { color: var(--warn); }
 .panel .step > .ic { width: 16px; height: 16px; flex: none; }
+
+/* ---------- phone: one column that scrolls, panels as bottom sheets ---------- */
+.phone { --safe-top: max(env(safe-area-inset-top), 28px); --safe-bottom: max(env(safe-area-inset-bottom), 16px); }
+.phone body { overflow: hidden; }
+.phone #app { overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; }
+.phone .sky { position: fixed; }
+.phone .top { position: relative; flex: none; height: 56px; margin-top: var(--safe-top); padding: 0 12px 0 20px; }
+.phone .top .pill { display: none; }
+.phone .lang > .quiet { padding: 8px; }
+.phone .lang > .quiet .ic, .phone .lang > .quiet { font-size: 0; }
+.phone .lang > .quiet .ic { display: none; }
+.phone .side { position: relative; left: auto; top: auto; bottom: auto; width: auto; flex: none; display: block; padding: 18px 20px 0; }
+.phone h1 { font-size: 32px; line-height: 1.12; letter-spacing: -.6px; }
+.phone h1 br { display: none; }
+.phone .sub { margin-top: 8px; font-size: 15px; }
+.phone .list { margin-top: 24px; padding: 6px; border-radius: 26px; }
+.phone .found .list { margin-top: 0; }
+.phone .found { margin-top: 24px; }
+/* A row: the name, its value under it, the chevron at the right. */
+.phone .row { height: auto; min-height: 68px; padding: 12px 44px 12px 18px; flex-direction: column; align-items: flex-start; justify-content: center; gap: 1px; border-radius: 20px; }
+.phone .row.small { height: auto; min-height: 64px; }
+.phone .row .name { font-size: 17px; }
+.phone .row .value { margin-left: 0; font-size: 14px; }
+.phone .row > .ic:first-child:not(:last-child) { display: none; }
+.phone .row > .ic:last-child { position: absolute; right: 16px; top: 50%; margin-top: -9px; }
+.phone .row[data-ip] .value { display: none; }
+.phone .row.static { flex-direction: row; align-items: center; padding-right: 18px; }
+.phone .row.static > .ic:first-child { display: block; position: static; margin: 0; }
+.phone .below { margin-top: 10px; flex-wrap: wrap; gap: 6px 14px; }
+.phone .manual { margin-top: 26px; }
+.phone .manual .label { font-size: 14px; }
+.phone .field { margin-top: 10px; height: 56px; padding: 6px 6px 6px 22px; }
+.phone .manual .field { margin-top: 0; }
+.phone .field input { font-size: 17px; }
+.phone .go { height: 44px; padding: 0 20px; font-size: 15px; }
+.phone .go:hover { transform: none; }
+.phone .foot { margin-top: 16px; }
+.phone .quiet.danger { margin-top: 12px; margin-left: -2px; }
+.phone .byline { position: relative; left: auto; bottom: auto; margin-top: auto; padding: 32px 14px calc(var(--safe-bottom) + 8px); flex-wrap: wrap; }
+
+/* The panel slides up over the screen, which dims behind it; Cancel and Go stay at the bottom. */
+.phone .panel {
+  position: fixed; left: 0; right: 0; top: calc(var(--safe-top) + 64px); bottom: 0; width: auto; z-index: 20;
+  border-radius: 30px 30px 0 0; opacity: 1; transform: translateY(100%);
+  background: linear-gradient(170deg, #fafaff, #f2f4fa);
+  box-shadow: inset 0 1px 0 #fff, 0 0 0 100vmax rgba(27, 34, 51, 0), 0 -20px 60px -30px rgba(58, 68, 128, .5);
+  transition: transform .34s var(--ease), box-shadow .3s linear;
+}
+.phone .panel.on { transform: none; box-shadow: inset 0 1px 0 #fff, 0 0 0 100vmax rgba(27, 34, 51, .18), 0 -20px 60px -30px rgba(58, 68, 128, .5); }
+.phone .panel::before { content: ""; position: absolute; left: 50%; top: 10px; width: 40px; height: 5px; margin-left: -20px; border-radius: 3px; background: rgba(27, 34, 51, .18); }
+.phone .panel header { padding: 30px 24px 4px; }
+.phone .panel h2 { font-size: 26px; }
+.phone .panel header p { font-size: 14.5px; margin-top: 6px; }
+.phone .panel .body { padding: 4px 8px; }
+.phone .panel .label { padding: 20px 16px 8px; }
+.phone .panel .note { padding: 6px 16px 0; }
+.phone .panel footer { padding: 14px 24px calc(var(--safe-bottom) + 14px); }
+.phone .panel footer .go { height: 48px; padding: 0 26px; font-size: 16px; }
+.phone .panel .step { padding: 0 16px; font-size: 16px; }
+.phone .choices { gap: 6px; padding: 0 4px; }
+.phone .choice { padding: 7px; border-radius: 16px; }
+.phone .thumb { height: 58px; border-radius: 10px; }
+.phone .choice span { margin-top: 6px; font-size: 13.5px; }
+.phone .swatches { gap: 4px; padding: 0 4px; }
+.phone .swatch { padding: 5px; }
+.phone .swatch .thumb { height: 42px; border-radius: 9px; }
+.phone .swatch .thumb i { top: 13px; height: 16px; border-radius: 4px; }
+.phone .swatch .thumb i.g { left: 7px; width: 20px; }
+.phone .swatch .thumb i.f { left: 31px; width: 22px; }
+.phone .swatch span { font-size: 12px; }
+.phone .photo-pick { flex-direction: column; align-items: stretch; gap: 10px; padding: 0 8px; }
+.phone .photo-prev { width: 100%; height: auto; aspect-ratio: 16 / 9; border-radius: 16px; }
+.phone .photo-prev:hover { transform: none; }
+.phone .photo-prev .photo-hover { opacity: 1; }
+.phone .photo-pick .photo-status { padding: 0 4px; }

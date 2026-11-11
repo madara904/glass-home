@@ -109,6 +109,8 @@ const en = {
   restoreNote: 'Removed apps do not come back by themselves. Get them from the Appstore if you need them.',
 
   keepOn: 'Do not turn the Fire TV off now.',
+  keepOpen: 'Keep Glass Home open and the phone on Wi-Fi until it is done.',
+  unfinished: (task: string, name: string) => `${task} on ${name} did not finish: the app was closed while it ran. Connect and run it again; it continues where it stopped.`,
   done: 'Done',
   allGood: 'Done and checked.',
   someFailed: 'Not everything worked. The details are next to the steps.',
@@ -221,6 +223,8 @@ const de: Dict = {
   restoreNote: 'Entfernte Apps kommen nicht von selbst zurück. Die holst du bei Bedarf aus dem Appstore.',
 
   keepOn: 'Den Fire TV jetzt nicht ausschalten.',
+  keepOpen: 'Glass Home offen und das Handy im WLAN lassen, bis es fertig ist.',
+  unfinished: (task: string, name: string) => `${task} auf ${name} wurde nicht fertig: Die App wurde währenddessen geschlossen. Verbinden und nochmal starten; es macht dort weiter, wo es aufgehört hat.`,
   done: 'Fertig',
   allGood: 'Fertig und geprüft.',
   someFailed: 'Nicht alles hat geklappt. Details stehen bei den Schritten.',
@@ -250,6 +254,10 @@ const backendDe: Record<string, string> = {
   'Remove DNS filter': 'DNS-Filter entfernen',
   'saved': 'gesichert',
   'already saved': 'schon vorhanden',
+  'taken from the TV': 'vom TV übernommen',
+  'Lost the connection to the Fire TV. Nothing is broken: connect again and run this again; it continues where it stopped.': 'Die Verbindung zum Fire TV ist weg. Nichts ist kaputt: neu verbinden und nochmal starten; es macht dort weiter, wo es aufgehört hat.',
+  'Another task is still running. Wait for it to finish.': 'Es läuft noch etwas. Bitte warten, bis es fertig ist.',
+  'Could not save the settings on this device; nothing was changed.': 'Die Einstellungen konnten auf diesem Gerät nicht gesichert werden; nichts wurde geändert.',
   'none selected': 'keine ausgewählt',
   'not yet on Fire OS 8': 'auf Fire OS 8 noch nicht',
   'not selected': 'nicht gewählt',

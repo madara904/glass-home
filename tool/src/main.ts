@@ -1,7 +1,7 @@
 import { api, THEMES, type App, type DebloatOptions, type Device, type Found, type DeviceState, type Step, type UiOptions, type Theme } from './api';
 import { flag, icon, mark } from './icons';
 import { lang, setLang, t, tr, type Lang } from './i18n';
-import { AUTHORS, REPO, openDevtools, openGithub, windowAction, windowButtons } from './titlebar';
+import { AUTHORS, REPO, isPhone, openDevtools, openGithub, windowAction, windowButtons } from './titlebar';
 import { splash } from './splash';
 
 // The desktop tool in the look of the app icon: its colours as the backdrop, frosted white glass
@@ -423,7 +423,7 @@ async function run(panel: HTMLElement, title: string, task: (onStep: (s: Step) =
   view = () => {};
   const steps = new Map<string, Step>();
   panel.innerHTML = `
-    <header><h2>${esc(title)}</h2><p>${t.keepOn}</p></header>
+    <header><h2>${esc(title)}</h2><p>${isPhone ? t.keepOpen : t.keepOn}</p></header>
     <div class="body"><div id="steps"></div><div id="summary"></div></div>
     <footer><button class="go" data-act="done" disabled>${t.done}</button></footer>`;
   const list = panel.querySelector('#steps')!;
@@ -508,4 +508,19 @@ document.addEventListener('mousedown', (e) => { if (!ctx.contains(e.target as No
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideCtx(); });
 window.addEventListener('blur', hideCtx);
 
-splash(() => (introSeen() ? connectView() : introView()));
+/** After a start: says which task the last run did not finish, on the connect screen. */
+async function noteUnfinished() {
+  const u = await api.unfinished().catch(() => null);
+  if (!u) return;
+  const task = u.task === 'debloat' ? t.debloat : u.task === 'ui' ? t.glassUi : t.restore;
+  const err = document.getElementById('err');
+  if (!err) return;
+  err.textContent = t.unfinished(task, u.name || u.ip);
+  err.classList.add('calm');
+}
+
+splash(() => {
+  if (introSeen()) connectView();
+  else introView();
+  void noteUnfinished();
+});

@@ -85,6 +85,12 @@ impl Adb {
 
     /// A shell command on the TV: stdout, then stderr, CRs removed. Empty when the TV did not answer.
     pub fn sh(&self, script: &str) -> String {
+        self.try_sh(script).unwrap_or_default()
+    }
+
+    /// The same, but an Err when the TV did not answer, so a dropped connection is never read as
+    /// empty output ("no packages", "no settings").
+    pub fn try_sh(&self, script: &str) -> Result<String, String> {
         self.with(|d| {
             let (mut out, mut err) = (Vec::new(), Vec::new());
             d.shell_command(&script, Some(&mut out), Some(&mut err))?;
@@ -92,7 +98,6 @@ impl Adb {
             Ok(out)
         })
         .map(|b| String::from_utf8_lossy(&b).replace('\r', "").trim_end().to_string())
-        .unwrap_or_default()
     }
 
     /// First line of a shell command, trimmed.

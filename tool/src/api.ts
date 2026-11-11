@@ -34,6 +34,12 @@ export interface DeviceState {
   arrows: boolean;
 }
 
+export interface Unfinished {
+  task: 'debloat' | 'ui' | 'restore';
+  name: string;
+  ip: string;
+}
+
 export interface App {
   pkg: string;
   label: string;
@@ -127,6 +133,8 @@ export const api = {
   /** The owner's photo (a 1920 x 1080 JPEG) as the TV's wallpaper, with a colour scheme. */
   setWallpaper: (jpeg: Uint8Array, theme: Theme): Promise<void> =>
     inTauri ? invoke<void>('set_wallpaper', { image: Array.from(jpeg), theme }) : wait(1200).then(() => undefined),
+  /** A task the last run of the app did not finish (killed, or the phone died), once. */
+  unfinished: (): Promise<Unfinished | null> => (inTauri ? invoke<Unfinished | null>('unfinished') : Promise.resolve(null)),
   disconnect: (): Promise<void> => (inTauri ? invoke('disconnect') : Promise.resolve()),
   debloat: (o: DebloatOptions, onStep: (s: Step) => void) =>
     inTauri ? runTask('run_debloat', { options: o }, onStep)

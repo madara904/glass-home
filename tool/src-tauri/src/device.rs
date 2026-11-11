@@ -167,6 +167,37 @@ pub fn reboot_and_wait(adb: &Adb) -> Result<(), String> {
     Err("The Fire TV did not come back after the restart. Please check the TV.".into())
 }
 
+/// A copy of the tool's notes on the TV itself (shell-only, kept through reboots and app removals),
+/// so Restore still works when the phone that ran Debloat died, was reset, or the TV's address changed.
+pub const TV_NOTES: &str = "/data/local/tmp/glasshome";
+
+pub fn keep_on_tv(adb: &Adb, local: &Path) {
+    let Some(name) = local.file_name().and_then(|n| n.to_str()) else { return };
+    adb.sh(&format!("mkdir -p {TV_NOTES}"));
+    let _ = adb.push(local, &format!("{TV_NOTES}/{name}"));
+}
+
+/// The note from this device, or else the TV's copy (written to this device for next time).
+pub fn local_or_tv(adb: &Adb, dir: &Path, name: &str) -> String {
+    let local = dir.join(name);
+    if let Ok(t) = std::fs::read_to_string(&local) {
+        if !t.trim().is_empty() {
+            return t;
+        }
+    }
+    if adb.sh1(&format!("[ -s {TV_NOTES}/{name} ] && echo yes")) == "yes" && adb.pull(&format!("{TV_NOTES}/{name}"), &local).is_ok() {
+        return std::fs::read_to_string(&local).unwrap_or_default();
+    }
+    String::new()
+}
+
+/// Writes through a temporary file, so a phone dying mid-write leaves the old file or none.
+pub fn write_atomic(path: &Path, text: &str) -> std::io::Result<()> {
+    let part = path.with_extension("part");
+    std::fs::write(&part, text)?;
+    std::fs::rename(&part, path)
+}
+
 /// Where the tool keeps what it needs to undo its work on this TV (settings snapshot, log).
 pub fn device_dir(base: &Path, serial: &str) -> PathBuf {
     let safe: String = serial.chars().map(|c| if c.is_ascii_alphanumeric() || c == '.' { c } else { '_' }).collect();
@@ -185,10 +216,20 @@ pub fn config_path(sdk: u32, pkg: &str) -> String {
 
 /// key=value lines of the launcher's home.conf on the TV.
 pub fn read_config(adb: &Adb, sdk: u32, pkg: &str) -> Vec<(String, String)> {
-    let mut text = adb.sh(&format!("cat {}", config_path(sdk, pkg)));
+    read_config_checked(adb, sdk, pkg).unwrap_or_default()
+}
+
+/// The launcher's settings, or an Err when the TV did not answer: a reinstall must never take a
+/// dropped connection for "no settings" and start over with the defaults.
+pub fn read_config_checked(adb: &Adb, sdk: u32, pkg: &str) -> Result<Vec<(String, String)>, String> {
+    let mut text = adb.try_sh(&format!("cat {}", config_path(sdk, pkg)))?;
     if sdk >= 30 && text.contains("No such file") {
-        text = adb.sh(&format!("cat /sdcard/Android/data/{pkg}/files/home.conf"));
+        text = adb.try_sh(&format!("cat /sdcard/Android/data/{pkg}/files/home.conf"))?;
     }
+    Ok(parse_config(&text))
+}
+
+fn parse_config(text: &str) -> Vec<(String, String)> {
     text.lines()
         .filter(|l| !l.starts_with('#') && l.contains('='))
         .filter_map(|l| l.split_once('=').map(|(k, v)| (k.trim().to_string(), v.trim().to_string())))

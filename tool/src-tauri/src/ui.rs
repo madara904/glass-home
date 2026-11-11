@@ -6,7 +6,7 @@
 
 use crate::adb::Adb;
 use crate::device::{self, AMAZON_HOME, GLASS, LEGACY};
-use crate::steps::Steps;
+use crate::steps::{Steps, LOST};
 use serde::Deserialize;
 use std::path::Path;
 use std::thread;
@@ -33,15 +33,33 @@ const SAVED_FUTURITY: &str = "glasshome_min_futurity";
 
 pub fn run(adb: &Adb, sdk: u32, apk: &Path, o: &Options, s: &mut Steps) -> bool {
     let have = device::installed(adb);
+    if have.is_empty() {
+        s.fail("migrate", LOST);
+        return false;
+    }
 
     // 1. Carry over an earlier install's settings.
-    s.run("migrate");
+    if !s.start(adb, "migrate") {
+        return false;
+    }
     let mut conf: Vec<(String, String)> = Vec::new();
     if have.contains(GLASS) {
-        conf = device::read_config(adb, sdk, GLASS);
+        conf = match device::read_config_checked(adb, sdk, GLASS) {
+            Ok(c) => c,
+            Err(_) => {
+                s.fail("migrate", LOST);
+                return false;
+            }
+        };
         s.done("migrate", Some("settings kept".into()));
     } else if have.contains(LEGACY) {
-        conf = device::read_config(adb, sdk, LEGACY);
+        conf = match device::read_config_checked(adb, sdk, LEGACY) {
+            Ok(c) => c,
+            Err(_) => {
+                s.fail("migrate", LOST);
+                return false;
+            }
+        };
         set_guard(adb, "");
         adb.sh(&format!("pm uninstall {LEGACY}"));
         s.done("migrate", Some("old version carried over".into()));
@@ -50,7 +68,9 @@ pub fn run(adb: &Adb, sdk: u32, apk: &Path, o: &Options, s: &mut Steps) -> bool 
     }
 
     // 2. The app.
-    s.run("install");
+    if !s.start(adb, "install") {
+        return false;
+    }
     if let Err(e) = adb.install(apk) {
         s.fail("install", &e);
         return false;
@@ -64,7 +84,9 @@ pub fn run(adb: &Adb, sdk: u32, apk: &Path, o: &Options, s: &mut Steps) -> bool 
     s.done("install", device::version(adb, GLASS).map(|v| format!("version {v}")));
 
     // 3. Its settings: one start creates its folder, then the file goes in and the app restarts.
-    s.run("config");
+    if !s.start(adb, "config") {
+        return false;
+    }
     adb.sh(&format!("am start -n {GLASS}/.Home"));
     thread::sleep(Duration::from_secs(4));
     let set = |conf: &mut Vec<(String, String)>, k: &str, v: &str| {
@@ -88,7 +110,9 @@ pub fn run(adb: &Adb, sdk: u32, apk: &Path, o: &Options, s: &mut Steps) -> bool 
     }
 
     // 4. HOME.
-    s.run("home");
+    if !s.start(adb, "home") {
+        return false;
+    }
     if sdk < 28 {
         // Fire OS 6.7 refuses third-party accessibility services: the Keeper watches instead.
         set_guard(adb, "");
@@ -117,7 +141,9 @@ pub fn run(adb: &Adb, sdk: u32, apk: &Path, o: &Options, s: &mut Steps) -> bool 
     s.done("home", None::<String>);
 
     // 5. Check.
-    s.run("verify");
+    if !s.start(adb, "verify") {
+        return false;
+    }
     let mut front = String::new();
     for _ in 0..10 {
         thread::sleep(Duration::from_secs(1));
