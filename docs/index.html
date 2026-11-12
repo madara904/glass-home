@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Glass Home – Remove ads from your Fire TV Stick (Windows &amp; Mac)</title>
-<meta name="description" content="Remove ads from your Amazon Fire TV Stick: a one-click debloater and a clean, ad-free home screen, from Windows or Mac. No root, no terminal, fully reversible. Free and open source.">
+<title>Glass Home – Remove ads from your Fire TV Stick (Windows, Mac &amp; Android)</title>
+<meta name="description" content="Remove ads from your Amazon Fire TV Stick: a one-click debloater and a clean, ad-free home screen, from Windows, Mac or Android. No root, no terminal, fully reversible. Free and open source.">
 <meta name="keywords" content="Fire TV, Fire TV Stick, Firestick, remove ads, debloat, custom launcher, home screen, no root, Fire OS, Fire TV Werbung entfernen">
 <link rel="canonical" href="https://madara904.github.io/glass-home/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Glass Home">
 <meta property="og:title" content="Glass Home – Remove ads from your Fire TV">
-<meta property="og:description" content="One-click debloater and a clean glass home screen for Fire TV, from Windows or Mac. No root, fully reversible.">
+<meta property="og:description" content="One-click debloater and a clean glass home screen for Fire TV, from Windows, Mac or Android. No root, fully reversible.">
 <meta property="og:url" content="https://madara904.github.io/glass-home/">
 <meta property="og:image" content="https://madara904.github.io/glass-home/img/social.jpg">
 <meta property="og:image:width" content="1200">
@@ -20,8 +20,8 @@
 <meta name="theme-color" content="#e6eaf6">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"SoftwareApplication","name":"Glass Home",
- "description":"Remove ads from your Amazon Fire TV Stick: a one-click debloater and a clean glass home screen, from Windows or Mac. No root, fully reversible.",
- "applicationCategory":"UtilitiesApplication","operatingSystem":"Windows, macOS",
+ "description":"Remove ads from your Amazon Fire TV Stick: a one-click debloater and a clean glass home screen, from Windows, Mac or Android. No root, fully reversible.",
+ "applicationCategory":"UtilitiesApplication","operatingSystem":"Windows, macOS, Android",
  "offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},
  "license":"https://opensource.org/licenses/MIT",
  "url":"https://madara904.github.io/glass-home/","downloadUrl":"https://github.com/madara904/glass-home/releases/latest",
@@ -238,11 +238,11 @@
           <div>
             <h3>Pick your Fire TV</h3>
             <p>Glass Home looks for your Fire TV on the network by itself and lists it with its name.
-              Click it. If it is not in the list, type its address: it is on the TV under
-              Settings › My Fire TV › About › Network.</p>
+              Click <b>Connect</b> next to it. If it is not in the list, type its address below the list: it is
+              on the TV under Settings › My Fire TV › About › Network.</p>
           </div>
           <img class="shot" src="img/tool-2-connect.webp" width="1180" height="760" loading="lazy"
-            alt="The connect screen listing a Fire TV, a Fire TV Cube with ADB still off, and a Google TV marked as not supported">
+            alt="The connect screen: a table with a Fire TV ready to connect, a Fire TV Cube with ADB debugging off and a Google TV that is not supported, the address field below and the three steps on the TV">
         </div>
         <div class="step glass text-only">
           <div>
@@ -254,11 +254,12 @@
         <div class="step glass">
           <div>
             <h3>Debloat</h3>
-            <p>Click <b>Debloat</b>. Choose what stays: Prime Video, Alexa and Fire OS updates are kept unless
-              you switch them off. Your own apps stay too, unless you mark them for removal. Click <b>Start</b>.</p>
+            <p>Open <b>Debloat</b> in the sidebar. Choose what stays: Prime Video, Alexa and Fire OS updates are
+              kept unless you switch them off. Your own apps stay too, unless you switch them to Remove. Click
+              <b>Start</b> at the bottom right.</p>
           </div>
           <img class="shot" src="img/tool-4-debloat.webp" width="1180" height="760" loading="lazy"
-            alt="The Debloat panel with Prime Video, Alexa and Fire OS updates kept and the DNS filter on">
+            alt="The Debloat page: switches for Prime Video, Alexa, Fire OS updates and the DNS filter, the owner's apps below, Start at the bottom right">
         </div>
         <div class="step glass text-only">
           <div>
@@ -269,7 +270,7 @@
         <div class="step glass text-only">
           <div>
             <h3>Install the glass home screen</h3>
-            <p>Click <b>Glass UI</b>, pick a layout and click <b>Install</b>. From now on the Home button on
+            <p>Open <b>Glass UI</b>, pick a layout and colours and click <b>Install</b>. From now on the Home button on
               the remote opens Glass Home. Colours, wallpaper, layout and everything else you change on
               the TV, under Settings in Glass Home.</p>
           </div>
@@ -277,7 +278,7 @@
         <div class="step glass text-only">
           <div>
             <h3>Turn off ADB debugging</h3>
-            <p>When you are done, click <b>Turn off ADB debugging</b> under the actions. Nobody on your network
+            <p>When you are done, click <b>Turn off…</b> next to ADB debugging on the Overview. Nobody on your network
               can control the TV over ADB after that, and Glass Home keeps working. To restore or update later,
               switch it back on at the TV:</p>
             <div class="path"><span>My Fire TV</span><i>›</i><span>Developer options</span><i>›</i><span>ADB debugging: On</span></div>

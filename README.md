@@ -1,7 +1,7 @@
 <h1 align="center">Glass Home</h1>
 
 <p align="center">
-  <b>A glass home screen for your Fire TV, set up from Windows or Mac.</b><br>
+  <b>A glass home screen for your Fire TV, set up from Windows, Mac or Android.</b><br>
   Your colours, your own photos, a slideshow, and Amazon's ads turned off.<br>
   A small Tauri app that speaks adb itself. No root, no terminal, undo in one click.
 </p>

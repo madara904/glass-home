@@ -98,7 +98,7 @@ const mockDevice: Device = {
   serial: '192.168.1.20:5555', ip: '192.168.1.20', model: 'AFTSS',
   name: 'Fire TV Stick Lite', fireOs: 'Fire OS 7', sdk: 28, supported: true,
 };
-const mockState: DeviceState = { debloated: true, disabled: 34, dnsFilter: true, glassUi: true, glassVersion: '1.0', layout: 'icons', tiles: 'original', theme: 'neutral', arrows: false };
+const mockState: DeviceState = { debloated: true, disabled: 34, dnsFilter: true, glassUi: true, glassVersion: '0.2.0', layout: 'dock', tiles: 'original', theme: 'neutral', arrows: false };
 const mockApps: App[] = [
   { pkg: 'com.ionitech.airscreen', label: 'AirScreen' },
   { pkg: 'com.disney.disneyplus', label: 'Disney+' },
