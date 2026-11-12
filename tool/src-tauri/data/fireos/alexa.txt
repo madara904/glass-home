@@ -6,15 +6,15 @@
 # One list for Fire OS 6, 7 and 8: a package that is not on the TV is skipped.
 # com.amazon.vizzini is not here on purpose; see never-disable.txt.
 com.amazon.aca                         # the app that owns the microphone
-com.amazon.alexa.datastore.app
-com.amazon.alexadirectivebrokerservice
-com.amazon.alexamediaplayer.runtime.ftv
-com.amazon.alexa.externalmediaplayer.fireos
-com.amazon.tv.alexaalerts
-com.amazon.tv.alexanotifications
-com.amazon.vizzini.ftvcds
-com.amazon.firetv.androidskillconnectioncapability
-com.amazon.audiohome
+com.amazon.alexa.datastore.app         # Alexa data store
+com.amazon.alexadirectivebrokerservice # Alexa command handling
+com.amazon.alexamediaplayer.runtime.ftv# Alexa media playback
+com.amazon.alexa.externalmediaplayer.fireos# Alexa control of other players
+com.amazon.tv.alexaalerts              # Alexa alarms and timers
+com.amazon.tv.alexanotifications       # Alexa notifications
+com.amazon.vizzini.ftvcds              # Alexa voice service
+com.amazon.firetv.androidskillconnectioncapability# Alexa skills for apps
+com.amazon.audiohome                   # Alexa audio home
 com.amazon.rtcsessioncontroller        # Alexa calling
 com.amazon.smarthomemapviewapp         # "Alexa Smart Home" dashboard
 com.amazon.spotify.mediabrowserservice # lets Alexa play Spotify

@@ -1,4 +1,4 @@
-import { api, THEMES, type App, type DebloatOptions, type Device, type Found, type DeviceState, type Step, type UiOptions, type Theme } from './api';
+import { api, THEMES, type App, type DebloatOptions, type Plan, type PlanItem, type Device, type Found, type DeviceState, type Step, type UiOptions, type Theme } from './api';
 import { flag, icon, mark } from './icons';
 import { lang, setLang, t, tr, type Lang } from './i18n';
 import { AUTHORS, REPO, isPhone, openDevtools, openGithub, windowAction, windowButtons } from './titlebar';
@@ -225,12 +225,65 @@ function toggleSwitch(row: HTMLElement, on: boolean) {
 /** The page's choices survive a language switch; they start fresh with each connection. */
 let debloatOpts: DebloatOptions | null = null;
 let appList: App[] | null = null;
+let plan: Plan | null = null;
+let planOpen = false;
+
+/** Whether a package of the plan goes: checked, and not held back by Alexa or updates. */
+function planState(o: DebloatOptions, it: PlanItem, alexa: boolean): 'go' | 'skip' | 'held' {
+  if (alexa && o.keepAlexa) return 'held';
+  if (!alexa && o.keepUpdates && plan!.ota.includes(it.pkg)) return 'held';
+  return o.skip.includes(it.pkg) ? 'skip' : 'go';
+}
+
+/** The accordion: every Amazon package Debloat would turn off, checked by default. */
+function planCard(o: DebloatOptions): string {
+  const head = (count: string) => `<button class="row acc-head" data-act="acc" aria-expanded="${planOpen}">
+      <span class="t"><span class="n">${t.amazonPackages}</span><span class="d">${t.planHint}</span></span>
+      <span class="v">${count}</span><span class="acc-chev">${icon.chevronDown(16)}</span></button>`;
+  if (!plan) return head(t.readingPlan);
+  const all = [...plan.groups.flatMap((g) => g.items.map((it) => [it, false] as const)), ...plan.alexa.map((it) => [it, true] as const)];
+  const counted = all.filter(([it, a]) => planState(o, it, a) !== 'held');
+  const chosen = counted.filter(([it, a]) => planState(o, it, a) === 'go').length;
+  const item = (it: PlanItem, alexa: boolean) => {
+    const st = planState(o, it, alexa);
+    const note = st === 'held' ? (alexa ? t.alexaStays : t.keptForUpdates) : it.off ? t.alreadyOff : '';
+    return `<button class="row check" data-pkg="${esc(it.pkg)}" data-alexa="${alexa}" role="checkbox" aria-checked="${st === 'go'}" ${st === 'held' ? 'disabled' : ''}>
+      <span class="cb ${st === 'go' ? 'on' : ''}">${icon.check(14)}</span>
+      <span class="t"><span class="n">${esc(it.desc || it.pkg)}</span><span class="d mono">${esc(it.pkg)}</span></span>
+      <span class="v">${note}</span></button>`;
+  };
+  const group = (title: string, items: string) => `<div class="sub-head">${esc(title)}</div>${items}`;
+  const body = [
+    ...plan.groups.map((g) => group(t.groupName[g.key] ?? g.key, g.items.map((it) => item(it, false)).join(''))),
+    plan.alexa.length ? group(t.alexa, plan.alexa.map((it) => item(it, true)).join('')) : '',
+    plan.protected.length ? group(t.throttled, `<div class="row"><span class="t"><span class="d">${t.throttledHint}</span></span></div>` +
+      plan.protected.map((it) => `<div class="row check ro"><span class="cb ro">${icon.minus(14)}</span><span class="t"><span class="n">${esc(it.desc || it.pkg)}</span><span class="d mono">${esc(it.pkg)}</span></span></div>`).join('')) : '',
+  ].join('');
+  return head(t.selectedOf(chosen, counted.length)) + `<div class="acc-body" ${planOpen ? '' : 'hidden'}>${body}</div>`;
+}
+
+function bindPlan(o: DebloatOptions) {
+  const box = document.getElementById('plan');
+  if (!box) return;
+  box.innerHTML = planCard(o);
+  box.querySelector('[data-act=acc]')!.addEventListener('click', () => {
+    planOpen = !planOpen;
+    bindPlan(o);
+  });
+  box.querySelectorAll<HTMLElement>('[data-pkg]').forEach((r) => r.addEventListener('click', () => {
+    const pkg = r.dataset.pkg!;
+    o.skip = o.skip.includes(pkg) ? o.skip.filter((p) => p !== pkg) : [...o.skip, pkg];
+    bindPlan(o);
+  }));
+}
 
 async function debloatPage() {
-  const o = (debloatOpts ??= { keepPrime: true, keepAlexa: true, keepUpdates: true, dnsFilter: true, remove: [] });
+  const o = (debloatOpts ??= { keepPrime: true, keepAlexa: true, keepUpdates: true, dnsFilter: true, remove: [], skip: [] });
   frame(`
     <h1>${t.debloat}</h1>
     <p class="sub">${t.debloatSub}</p>
+    <div class="label">${t.whatGoes}</div>
+    <div class="card acc" id="plan"></div>
     <div class="label">${t.whatStays}</div>
     <div class="card">
       ${switchRow('keepPrime', t.primeVideo, '', o.keepPrime)}
@@ -246,8 +299,15 @@ async function debloatPage() {
     const k = r.dataset.opt as 'keepPrime' | 'keepAlexa' | 'keepUpdates' | 'dnsFilter';
     o[k] = !o[k];
     toggleSwitch(r, o[k]);
+    // Alexa and updates decide whether their packages can go at all.
+    if (k === 'keepAlexa' || k === 'keepUpdates') bindPlan(o);
   }));
   root.querySelector('[data-act=go]')!.addEventListener('click', () => run(t.debloat, (s) => api.debloat(o, s)));
+  bindPlan(o);
+  if (!plan) {
+    plan = await api.plan().catch(() => null);
+    if (page === 'debloat') bindPlan(o);
+  }
   if (!appList) {
     appList = await api.apps().catch(() => []);
     const box = document.getElementById('apps');
@@ -262,7 +322,7 @@ function appRows(o: DebloatOptions): string {
   return appList.map((a) => {
     const gone = o.remove.includes(a.pkg);
     return `<button class="row app" data-app="${esc(a.pkg)}" role="switch" aria-checked="${gone}">
-      <span class="t"><span class="n">${esc(a.label)}</span><span class="d mono">${esc(a.pkg)}</span></span>
+      <span class="t"><span class="n">${esc(a.label)}</span>${a.label !== a.pkg ? `<span class="d mono">${esc(a.pkg)}</span>` : ''}</span>
       <span class="v ${gone ? 'rose' : ''}">${gone ? t.removeApp : t.stays}</span><span class="sw rose ${gone ? 'on' : ''}"></span></button>`;
   }).join('');
 }
@@ -435,6 +495,7 @@ async function run(title: string, task: (onStep: (s: Step) => void) => Promise<b
   }
   busy = false;
   appList = null;
+  plan = null;
   // The sidebar unlocks; the steps stay on screen until Done.
   const side = root.querySelector('.side');
   if (side) side.outerHTML = sidebar();
@@ -496,7 +557,7 @@ root.addEventListener('click', (e) => {
     case 'connect': connect((document.getElementById('ip') as HTMLInputElement).value); break;
     case 'scan': scan(); break;
     case 'disconnect':
-      debloatOpts = null; uiOpts = null; appList = null; photoThumb = '';
+      debloatOpts = null; uiOpts = null; appList = null; plan = null; photoThumb = '';
       api.disconnect().then(() => connectView());
       break;
     case 'adb-off': adbOffDialog(); break;

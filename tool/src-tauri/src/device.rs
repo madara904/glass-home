@@ -311,13 +311,17 @@ pub fn user_apps(adb: &Adb, cache_dir: &Path) -> Vec<App> {
         if skip.contains(&pkg) || pkg.contains(".overlay") || pkg.starts_with("com.amazon.") {
             continue;
         }
-        let label = match cache.get(path) {
+        // Only real names are remembered: a read that failed once (a dropped connection) must not
+        // show the package id for good. An old cache entry that is just the id is read again.
+        let label = match cache.get(path).filter(|l| l.as_str() != pkg) {
             Some(l) => l.clone(),
-            None => {
-                let l = read_label(adb, cache_dir, path).unwrap_or_else(|| pkg.to_string());
-                cache.insert(path.to_string(), l.clone());
-                l
-            }
+            None => match read_label(adb, cache_dir, path) {
+                Some(l) => {
+                    cache.insert(path.to_string(), l.clone());
+                    l
+                }
+                None => pkg.to_string(),
+            },
         };
         out.push(App { pkg: pkg.to_string(), label });
     }

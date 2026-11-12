@@ -23,31 +23,31 @@ com.amznfuse.operatorredirection       # fire os 6: telco partner redirection
 com.amazon.hedwig                      # watch time and engagement
 
 # --- telemetry, logging, crash reporting ---
-com.amazon.tv.fw.metrics
-com.amazon.wirelessmetrics.service
-com.amazon.perfcollection
-com.amazon.dp.logger
-com.amazon.logan
+com.amazon.tv.fw.metrics               # system usage metrics
+com.amazon.wirelessmetrics.service     # Wi-Fi usage metrics
+com.amazon.perfcollection              # performance data collection
+com.amazon.dp.logger                   # device log uploads
+com.amazon.logan                       # log collection and upload
 com.amazon.ceviche                     # analytics pipeline
-com.amazon.connectivitydiag
-com.amazon.tigris
-com.amazon.tv.developer.dataservice
+com.amazon.connectivitydiag            # network diagnostics reports
+com.amazon.tigris                      # Amazon telemetry service
+com.amazon.tv.developer.dataservice    # usage data for Amazon developers
 com.amazon.wifilocker                  # fire os 6: uploads saved Wi-Fi passwords to Amazon
 
 # --- experiments and remote config ---
-com.amazon.ale
-com.amazon.katoch
+com.amazon.ale                         # experiments (A/B tests)
+com.amazon.katoch                      # remote feature switches
 
 # --- update nags (the updater itself is protected, see protected.txt) ---
-com.amazon.tv.forcedotaupdater.v2
-com.amazon.tv.easyupgrade
+com.amazon.tv.forcedotaupdater.v2      # forced update prompts
+com.amazon.tv.easyupgrade              # upgrade offers
 
 # --- setup helpers for other Amazon devices ---
 com.amazon.whisperjoin.wss.wifiprovisioner  # fire os 6: hands Wi-Fi to new Amazon devices
 com.amazon.tv.ffsprovisioneeclient     # fire os 6: frustration-free setup client
 
 # --- demos, tutorials, test services and empty stubs ---
-com.amazon.tmm.tutorial
-com.amazon.tv.releasenotes
+com.amazon.tmm.tutorial                # tutorial videos
+com.amazon.tv.releasenotes             # release notes pop-ups
 com.mediatek.atci.service              # fire os 6: MediaTek AT-command test service
 com.android.carrierconfig              # fire os 6: no SIM

@@ -16,6 +16,46 @@ pub fn words(text: &str) -> Vec<String> {
         .collect()
 }
 
+/// A list file as groups: `# --- title ---` lines start a group, a comment after a package
+/// describes it. Packages before the first title land in a group without one.
+pub fn grouped(text: &str) -> Vec<(String, Vec<(String, String)>)> {
+    let mut out: Vec<(String, Vec<(String, String)>)> = Vec::new();
+    for line in text.lines() {
+        let l = line.trim();
+        if let Some(t) = l.strip_prefix("# ---") {
+            let title = t.trim_end_matches('-').trim();
+            // "update nags (the updater itself is protected, …)": the part before the bracket.
+            let title = title.split(" (").next().unwrap_or(title).trim().to_string();
+            out.push((title, Vec::new()));
+            continue;
+        }
+        if l.is_empty() || l.starts_with('#') {
+            continue;
+        }
+        let (pkg, desc) = match l.split_once('#') {
+            Some((p, d)) => (p.trim(), d.trim()),
+            None => (l, ""),
+        };
+        let Some(pkg) = pkg.split_whitespace().next() else { continue };
+        if out.is_empty() {
+            out.push((String::new(), Vec::new()));
+        }
+        out.last_mut().unwrap().1.push((pkg.to_string(), desc.to_string()));
+    }
+    out
+}
+
+/// The package files themselves, for the plan the window shows before Debloat.
+pub fn package_text(sdk: u32) -> &'static str {
+    if sdk > 0 && sdk < 28 { data!("fireos6/packages.txt") } else { data!("fireos/packages.txt") }
+}
+pub fn protected_text(sdk: u32) -> &'static str {
+    if sdk > 0 && sdk < 28 { data!("fireos6/protected.txt") } else { data!("fireos/protected.txt") }
+}
+pub fn alexa_text() -> &'static str {
+    data!("fireos/alexa.txt")
+}
+
 /// `namespace key value` lines (dumbtv also writes `key = value`).
 pub fn settings(text: &str) -> Vec<(String, String, String)> {
     text.lines()

@@ -4,11 +4,11 @@
 # filter kills their endpoints. The first seven were refused on a Fire TV Stick 4K;
 # the last two come from the Fire OS 7 list and were not tried there.
 com.amazon.client.metrics
-com.amazon.device.metrics
-com.amazon.device.crashmanager
+com.amazon.device.metrics              # device metrics
+com.amazon.device.crashmanager         # crash reports
 com.amazon.device.logmanager
-com.amazon.ftvads.deeplinking
-com.amazon.device.software.ota
-com.amazon.device.software.ota.override
-com.amazon.device.rdmapplication
-com.amazon.tv.csapp
+com.amazon.ftvads.deeplinking          # ad links
+com.amazon.device.software.ota         # Fire OS updater
+com.amazon.device.software.ota.override# Fire OS updater
+com.amazon.device.rdmapplication       # remote device management
+com.amazon.tv.csapp                    # customer service app

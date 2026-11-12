@@ -23,6 +23,62 @@ pub struct Options {
     pub keep_updates: bool,
     pub dns_filter: bool,
     pub remove: Vec<String>,
+    /// Packages of the lists the owner unchecked: they stay on.
+    #[serde(default)]
+    pub skip: Vec<String>,
+}
+
+/// One package of the plan: its description and whether it is off already.
+#[derive(serde::Serialize)]
+pub struct PlanItem {
+    pub pkg: String,
+    pub desc: String,
+    pub off: bool,
+}
+
+#[derive(serde::Serialize)]
+pub struct PlanGroup {
+    pub key: String,
+    pub items: Vec<PlanItem>,
+}
+
+/// What Debloat would do on this TV, before it runs: the packages it turns off by group, the
+/// Alexa ones (only when Alexa goes), the protected ones it can only throttle, and the updater's
+/// packages that stay while updates are kept. Only packages this TV has.
+#[derive(serde::Serialize)]
+pub struct Plan {
+    pub groups: Vec<PlanGroup>,
+    pub alexa: Vec<PlanItem>,
+    pub protected: Vec<PlanItem>,
+    pub ota: Vec<String>,
+}
+
+pub fn plan(adb: &Adb, sdk: u32) -> Result<Plan, String> {
+    let lists = Lists::for_sdk(sdk);
+    let have = device::installed(adb);
+    if have.is_empty() {
+        return Err(LOST.into());
+    }
+    let off = device::disabled(adb);
+    let never: HashSet<&String> = lists.never.iter().collect();
+    let items = |list: Vec<(String, String)>| -> Vec<PlanItem> {
+        list.into_iter()
+            .filter(|(p, _)| have.contains(p) && !never.contains(p))
+            .map(|(pkg, desc)| PlanItem { off: off.contains(&pkg), pkg, desc })
+            .collect()
+    };
+    let groups = crate::lists::grouped(crate::lists::package_text(sdk))
+        .into_iter()
+        .map(|(key, list)| PlanGroup { key, items: items(list) })
+        .filter(|g| !g.items.is_empty())
+        .collect();
+    let flat = |text: &str| crate::lists::grouped(text).into_iter().flat_map(|(_, l)| l).collect::<Vec<_>>();
+    Ok(Plan {
+        groups,
+        alexa: items(flat(crate::lists::alexa_text())),
+        protected: items(flat(crate::lists::protected_text(sdk))),
+        ota: OTA_PACKAGES.iter().map(|s| s.to_string()).collect(),
+    })
 }
 
 const APK_VERSION: &str = "1506103";
@@ -88,7 +144,7 @@ pub fn run(adb: &Adb, sdk: u32, dir: &Path, o: &Options, s: &mut Steps) -> bool 
     }
     let mut log = String::new();
     let (mut off, mut protected) = (0, 0);
-    for p in cleanup.iter().filter(|p| have.contains(*p) && !never.contains(p) && !keep.contains(p.as_str())) {
+    for p in cleanup.iter().filter(|p| have.contains(*p) && !never.contains(p) && !keep.contains(p.as_str()) && !o.skip.contains(p)) {
         let out = adb.sh1(&format!("pm disable-user --user 0 {p}"));
         if out.contains("disabled-user") {
             off += 1;

@@ -24,36 +24,36 @@ com.amazon.tv.acr                      # Automatic Content Recognition: fingerpr
 com.amazon.hedwig                      # watch time and engagement
 
 # --- telemetry, logging, crash reporting ---
-com.amazon.tv.fw.metrics
-com.amazon.wirelessmetrics.service
-com.amazon.perfc
-com.amazon.perfcollection
-com.amazon.dp.logger
-com.amazon.logan
-com.amazon.neo.minerva.logcat
+com.amazon.tv.fw.metrics               # system usage metrics
+com.amazon.wirelessmetrics.service     # Wi-Fi usage metrics
+com.amazon.perfc                       # performance data collection
+com.amazon.perfcollection              # performance data collection
+com.amazon.dp.logger                   # device log uploads
+com.amazon.logan                       # log collection and upload
+com.amazon.neo.minerva.logcat          # system log collection
 com.amazon.ceviche                     # analytics pipeline, uploads to unagi-*.amazon.com
-com.amazon.connectivitydiag
-com.amazon.tigris
-com.amazon.tv.developer.dataservice
+com.amazon.connectivitydiag            # network diagnostics reports
+com.amazon.tigris                      # Amazon telemetry service
+com.amazon.tv.developer.dataservice    # usage data for Amazon developers
 
 # --- experiments and remote config ---
-com.amazon.ale
-com.amazon.katoch
-com.amazon.device_remote_config_sync_service
+com.amazon.ale                         # experiments (A/B tests)
+com.amazon.katoch                      # remote feature switches
+com.amazon.device_remote_config_sync_service# remote configuration sync
 
 # --- update nags (the updater itself is protected, see protected.txt) ---
-com.amazon.tv.forcedotaupdater.v2
-com.amazon.tv.easyupgrade
+com.amazon.tv.forcedotaupdater.v2      # forced update prompts
+com.amazon.tv.easyupgrade              # upgrade offers
 
 # --- demos, tutorials and empty stubs ---
-com.amazon.tv.democontent.provider
-com.amazon.tmm.tutorial
-com.amazon.tv.releasenotes
-com.amazon.dummy.alarmclock
-com.amazon.dummy.calendar
-com.amazon.dummy.contacts
-com.amazon.dummy.gallery
-com.amazon.dummy.music
-com.amazon.dummy.settings
+com.amazon.tv.democontent.provider     # shop demo content
+com.amazon.tmm.tutorial                # tutorial videos
+com.amazon.tv.releasenotes             # release notes pop-ups
+com.amazon.dummy.alarmclock            # empty placeholder app
+com.amazon.dummy.calendar              # empty placeholder app
+com.amazon.dummy.contacts              # empty placeholder app
+com.amazon.dummy.gallery               # empty placeholder app
+com.amazon.dummy.music                 # empty placeholder app
+com.amazon.dummy.settings              # empty placeholder app
 com.android.traceur                    # system tracing tool
 com.android.nfc                        # no NFC hardware on Fire TV

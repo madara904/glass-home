@@ -4,10 +4,10 @@
 # background execution and background data, and the DNS filter kills their
 # endpoints. Add to this file whatever debloat.sh reports as PROTECTED on a
 # given build — the list differs between Fire OS versions.
-com.amazon.device.metrics
-com.amazon.device.crashmanager
-com.amazon.device.rdmapplication
-com.amazon.ftvads.deeplinking
-com.amazon.tv.csapp
-com.amazon.device.software.ota
-com.amazon.device.software.ota.override
+com.amazon.device.metrics              # device metrics
+com.amazon.device.crashmanager         # crash reports
+com.amazon.device.rdmapplication       # remote device management
+com.amazon.ftvads.deeplinking          # ad links
+com.amazon.tv.csapp                    # customer service app
+com.amazon.device.software.ota         # Fire OS updater
+com.amazon.device.software.ota.override# Fire OS updater

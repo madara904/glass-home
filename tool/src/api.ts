@@ -51,6 +51,24 @@ export interface DebloatOptions {
   keepUpdates: boolean;
   dnsFilter: boolean;
   remove: string[];
+  /** Packages of the lists the owner unchecked: they stay on. */
+  skip: string[];
+}
+
+export interface PlanItem {
+  pkg: string;
+  desc: string;
+  /** Off on the TV already. */
+  off: boolean;
+}
+
+/** What Debloat would turn off on this TV, grouped as in the lists. */
+export interface Plan {
+  groups: { key: string; items: PlanItem[] }[];
+  alexa: PlanItem[];
+  protected: PlanItem[];
+  /** The updater's packages: they stay while Fire OS updates are kept. */
+  ota: string[];
 }
 
 /** The launcher's colour schemes, as stored in glass.theme on the TV. */
@@ -99,6 +117,20 @@ const mockDevice: Device = {
   name: 'Fire TV Stick Lite', fireOs: 'Fire OS 7', sdk: 28, supported: true,
 };
 const mockState: DeviceState = { debloated: true, disabled: 34, dnsFilter: true, glassUi: true, glassVersion: '0.2.0', layout: 'dock', tiles: 'original', theme: 'neutral', arrows: false };
+const pi = (pkg: string, desc: string, off = false): PlanItem => ({ pkg, desc, off });
+const mockPlan: Plan = {
+  groups: [
+    { key: 'ads, promos and shopping', items: [pi('com.amazon.hybridadidservice', 'advertising ID', true), pi('com.amazon.sneakpeek', 'autoplaying promos', true), pi('com.amazon.media.recommendations', 'sponsored rows', true), pi('com.amazon.shoptv.client', 'shopping on the TV', true)] },
+    { key: 'tracking what you watch', items: [pi('com.amazon.tv.acr', 'Automatic Content Recognition: fingerprints the screen, HDMI included', true), pi('com.amazon.hedwig', 'watch time and engagement', true)] },
+    { key: 'telemetry, logging, crash reporting', items: [pi('com.amazon.tv.fw.metrics', 'system usage metrics', true), pi('com.amazon.logan', 'log collection and upload', true), pi('com.amazon.ceviche', 'analytics pipeline, uploads to unagi-*.amazon.com', true)] },
+    { key: 'experiments and remote config', items: [pi('com.amazon.ale', 'experiments (A/B tests)', true), pi('com.amazon.katoch', 'remote feature switches', true)] },
+    { key: 'update nags', items: [pi('com.amazon.tv.forcedotaupdater.v2', 'forced update prompts', true)] },
+    { key: 'demos, tutorials and empty stubs', items: [pi('com.amazon.tmm.tutorial', 'tutorial videos', true), pi('com.amazon.dummy.music', 'empty placeholder app', true)] },
+  ],
+  alexa: [pi('com.amazon.aca', 'the app that owns the microphone'), pi('com.amazon.rtcsessioncontroller', 'Alexa calling'), pi('com.amazon.aria', 'Alexa visual cards')],
+  protected: [pi('com.amazon.device.metrics', 'device metrics'), pi('com.amazon.device.crashmanager', 'crash reports')],
+  ota: ['com.amazon.device.software.ota', 'com.amazon.device.software.ota.override', 'com.amazon.tv.forcedotaupdater.v2'],
+};
 const mockApps: App[] = [
   { pkg: 'com.ionitech.airscreen', label: 'AirScreen' },
   { pkg: 'com.disney.disneyplus', label: 'Disney+' },
@@ -129,6 +161,8 @@ export const api = {
   connect: (ip: string): Promise<Device> =>
     inTauri ? invoke('connect', { ip }) : wait(900).then(() => ({ ...mockDevice, ip, serial: ip + ':5555' })),
   state: (): Promise<DeviceState> => (inTauri ? invoke('device_state') : wait(300).then(() => mockState)),
+  /** What Debloat would turn off on this TV. */
+  plan: (): Promise<Plan> => (inTauri ? invoke<Plan>('debloat_plan') : wait(400).then(() => mockPlan)),
   apps: (): Promise<App[]> => (inTauri ? invoke('user_apps') : wait(300).then(() => mockApps)),
   /** The owner's photo (a 1920 x 1080 JPEG) as the TV's wallpaper, with a colour scheme. */
   setWallpaper: (jpeg: Uint8Array, theme: Theme): Promise<void> =>

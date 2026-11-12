@@ -133,6 +133,14 @@ async fn disconnect(ctx: State<'_, Ctx>) -> Res<()> {
     Ok(())
 }
 
+/// What Debloat would turn off on this TV, for the window's checklist.
+#[tauri::command]
+async fn debloat_plan(ctx: State<'_, Ctx>) -> Res<debloat::Plan> {
+    let d = current(&ctx)?;
+    let adb = ctx.adb.clone();
+    blocking(move || debloat::plan(&adb, d.sdk)).await?
+}
+
 #[tauri::command]
 async fn device_state(ctx: State<'_, Ctx>) -> Res<device::State> {
     let d = current(&ctx)?;
@@ -337,7 +345,7 @@ pub fn run_cli(task: &str, ip: &str, data: Option<&str>) -> bool {
     println!("{} · {} · {}", d.name, d.fire_os, d.serial);
     match task {
         "filter" => {
-            let o = debloat::Options { keep_prime: true, keep_alexa: true, keep_updates: true, dns_filter: true, remove: vec![] };
+            let o = debloat::Options { keep_prime: true, keep_alexa: true, keep_updates: true, dns_filter: true, remove: vec![], skip: vec![] };
             match debloat::dns_filter(&adb, d.sdk, &o) {
                 Ok(n) => {
                     println!("done     DNS filter · {} entries", n.unwrap_or(0));
@@ -350,7 +358,7 @@ pub fn run_cli(task: &str, ip: &str, data: Option<&str>) -> bool {
             }
         }
         "debloat" => {
-            let o = debloat::Options { keep_prime: true, keep_alexa: true, keep_updates: true, dns_filter: true, remove: vec![] };
+            let o = debloat::Options { keep_prime: true, keep_alexa: true, keep_updates: true, dns_filter: true, remove: vec![], skip: vec![] };
             debloat::run(&adb, d.sdk, &dir, &o, &mut debloat_steps(None))
         }
         "ui" => {
@@ -397,7 +405,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            discover, connect, disconnect, unfinished, device_state, user_apps, run_debloat, run_install_ui, run_restore, adb_off, set_wallpaper, open_github, open_devtools
+            discover, connect, disconnect, unfinished, debloat_plan, device_state, user_apps, run_debloat, run_install_ui, run_restore, adb_off, set_wallpaper, open_github, open_devtools
         ])
         .run(tauri::generate_context!())
         .expect("Glass Home could not start");
