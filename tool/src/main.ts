@@ -4,142 +4,128 @@ import { lang, setLang, t, tr, type Lang } from './i18n';
 import { AUTHORS, REPO, isPhone, openDevtools, openGithub, windowAction, windowButtons } from './titlebar';
 import { splash } from './splash';
 
-// The desktop tool in the look of the app icon: its colours as the backdrop, frosted white glass
-// on top, a list like the TV's settings. The left column says where you are; the glass panel on
-// the right holds the choices and then the progress of whatever runs.
+// The tool in the look of the app icon: its colours as the sky, frosted white glass on top.
+// Without a TV: one centred column to connect. With a TV: a sidebar (the TV, the pages, the
+// credits) and one page at a time; a page that changes the TV has its action bottom right.
+// On a phone the sidebar goes away: Overview lists the pages, the others have a back arrow.
 
 const root = document.getElementById('app')!;
 let device: Device | null = null;
 let state: DeviceState | null = null;
-let open: string | null = null;
+
+type Page = 'overview' | 'debloat' | 'ui' | 'restore';
+let page: Page = 'overview';
+/** A task runs: the other pages and Disconnect wait for it. */
+let busy = false;
+/** Redraws the current screen, after a language switch. */
 let view: () => void = () => {};
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
-// A space before each break, so a title still reads right where the stylesheet hides the break.
-const lines = (s: string) => esc(s).replace(/\n/g, ' <br>');
-
-const INTRO = 'glasshome.intro';
-const introSeen = () => { try { return localStorage.getItem(INTRO) === '1'; } catch { return false; } };
-
+const oneLine = (s: string) => esc(s).replace(/\n/g, ' ');
 const LANGS: Record<Lang, string> = { en: 'English', de: 'Deutsch' };
-let shown = '';
 
-/** Draws a screen. The left column fades in only when the screen itself changes, not when a
- *  panel opens or closes or the language switches. */
-function frame(key: string, side: string, panel = '') {
-  const enter = key !== shown;
-  shown = key;
-  const pill = device
-    ? `<div class="pill">${icon.tv(18)}<b>${esc(device.name)}</b>${esc(device.ip)}</div>
-       <button class="quiet" data-act="disconnect">${t.disconnect}</button>`
-    : `<div class="pill">${icon.tv(18)}${t.noDevice}</div>`;
-  root.innerHTML = `
-    <div class="sky"></div>
-    <div class="top">${mark()}<div class="word">Glass Home</div><div class="spacer"></div>${pill}
-      <div class="lang"><button class="quiet" data-act="lang-menu">${flag(lang)}${t.langName}${icon.chevronDown(16)}</button>
-        <div class="menu">${(["en", "de"] as Lang[]).map((l) =>
-          `<button class="item" data-lang="${l}">${flag(l)}<span>${LANGS[l]}</span>${l === lang ? icon.check(16) : ""}</button>`).join("")}</div></div>
-      ${windowButtons()}</div>
-    <div class="side"><div class="${enter ? "fade" : ""}">${side}</div></div>${panel}
-    <div class="byline">${icon.github(16)}<button class="quiet" data-gh="${REPO}">${REPO}</button><span>·</span>${AUTHORS.map((a) => `<button class="quiet" data-gh="${a}">${a}</button>`).join('<span>·</span>')}</div>`;
+// ---------------------------------------------------------------- frame
+
+function langMenu(): string {
+  return `<div class="lang"><button class="bar-btn" data-act="lang-menu">${isPhone ? flag(lang) : t.langName}${icon.chevronDown(14)}</button>
+    <div class="menu">${(['en', 'de'] as Lang[]).map((l) =>
+      `<button class="item" data-lang="${l}">${flag(l)}<span>${LANGS[l]}</span>${l === lang ? icon.check(16) : ''}</button>`).join('')}</div></div>`;
 }
 
-// ---------------------------------------------------------------- intro
+/** Left end of the top bar: the name, or on a phone's inner pages the way back. */
+function topLeft(): string {
+  if (isPhone && device && page !== 'overview' && !busy) {
+    return `<button class="back" data-nav="overview">${icon.back(20)}${t.overview}</button>`;
+  }
+  return `<div class="brand">${mark(20)}<span>Glass Home</span></div>`;
+}
 
-function introView() {
-  view = introView;
-  const step = (ic: string, name: string, path: string) =>
-    `<div class="row small static">${ic}<span class="name">${name}<span class="path">${path}</span></span></div>`;
-  frame('intro', `
-      <h1>${lines(t.introTitle)}</h1>
-      <p class="sub">${t.introSub}</p>
-      <div class="list">
-        ${step(icon.settings(), t.introAbout, t.introAboutPath)}
-        ${step(icon.press(), t.introPress, t.introPressPath)}
-        ${step(icon.toggle(), t.introAdb, t.introAdbPath)}
-        ${step(icon.wifi(), t.introWifi, isPhone ? t.introWifiPathPhone : t.introWifiPath)}
-      </div>
-      <div class="below"><button class="go" data-act="intro-done">${t.introGo}</button><span class="aside">${icon.info(16)}${t.introVega}</span></div>
-    `);
+function credits(): string {
+  return `<div class="credits">${icon.github(14)}<button data-gh="${REPO}">${REPO}</button>${AUTHORS.map((a) => `<span>·</span><button data-gh="${a}">${a}</button>`).join('')}</div>`;
+}
+
+function deviceCard(): string {
+  const d = device!;
+  return `<div class="device">${icon.tv(20)}<div class="who"><div class="n">${esc(d.name)}</div><div class="m">${esc(tr(d.fireOs))} · ${esc(d.ip)}</div></div>
+    <button class="leave" data-act="disconnect" title="${t.disconnect}" aria-label="${t.disconnect}" ${busy ? 'disabled' : ''}>${icon.leave(18)}</button></div>`;
+}
+
+function sidebar(): string {
+  const s = state!;
+  const changed = s.debloated || s.glassUi;
+  const item = (p: Page, ic: string, name: string, value: string, off = false) =>
+    `<button class="nav-item ${p === page ? 'on' : ''}" data-nav="${p}" ${(busy && p !== page) || off ? 'disabled' : ''}>${ic}<span>${name}</span><span class="s">${esc(value)}</span></button>`;
+  return `<nav class="side">${deviceCard()}
+    <div class="nav">
+      ${item('overview', icon.overview(18), t.overview, '')}
+      ${item('debloat', icon.filter(18), t.debloat, s.debloated ? t.on : '')}
+      ${item('ui', icon.screen(18), t.glassUi, s.glassUi ? s.glassVersion ?? '' : '')}
+      ${item('restore', icon.undo(18), t.restore, '', !changed)}
+    </div>
+    <div class="grow"></div>${credits()}</nav>`;
+}
+
+/** Draws a screen: top bar, sidebar when a TV is connected, the page, and its action bar. */
+function frame(main: string, actions = '') {
+  const wide = !device;
+  root.innerHTML = `
+    <div class="sky"></div>
+    <div class="top">${topLeft()}<div class="spacer"></div>${langMenu()}${windowButtons()}</div>
+    ${wide ? '' : sidebar()}
+    <main class="main ${wide ? 'wide' : ''} ${actions ? 'has-actions' : ''}"><div class="page">${main}${wide ? credits() : ''}</div></main>
+    ${actions ? `<div class="actions ${wide ? 'wide' : ''}">${actions}</div>` : ''}`;
 }
 
 // ---------------------------------------------------------------- connect
 
-/** The connect screen. The network search starts by itself; typing the address is the fallback.
- *  A redraw (language switch) keeps the last results instead of searching again. */
+let found: Found[] | null = null;
+let searching = false;
+let searchError = '';
+let notice = '';
+
 function connectView(error = '', search = true) {
   view = () => connectView('', false);
   device = null;
   state = null;
-  frame('connect', `
-      <h1>${lines(t.connectTitle)}</h1>
-      <p class="sub">${t.connectSub}</p>
-      <div class="found" id="found">${foundList()}</div>
-      <div class="below">
-        <button class="quiet" data-act="scan" ${searching ? 'disabled' : ''}>${icon.reload(16)}${t.scan}</button>
-        <button class="quiet" data-act="intro">${icon.info(16)}${t.howTo}</button>
-      </div>
-      <div class="manual">
-        <p class="label">${t.manualTitle}</p>
-        <div class="field">
-          <input id="ip" placeholder="192.168.x.x" spellcheck="false" autocomplete="off" />
-          <button class="go" data-act="connect">${t.connect}</button>
-        </div>
-        <p class="hint">${t.manualHint}</p>
-      </div>
-      <p class="error" id="err">${esc(error)}</p>
-    `);
+  page = 'overview';
+  const step = (n: number, name: string, text: string) => `<div><b><em>${n}</em>${name}</b>${text}</div>`;
+  frame(`
+    <h1>${oneLine(t.connectTitle)}</h1>
+    <p class="sub">${t.findSub}</p>
+    <div class="card table" id="found">${foundTable()}</div>
+    <div class="under">
+      <input class="field" id="ip" placeholder="192.168.x.x" spellcheck="false" autocomplete="off" inputmode="decimal" />
+      <button class="btn" data-act="connect">${t.connectAt}</button>
+      <span class="spacer"></span>
+      <button class="link" data-act="scan" ${searching ? 'disabled' : ''}>${icon.reload(15)}${t.scan}</button>
+    </div>
+    <p class="error" id="err">${esc(error)}</p>
+    <div class="label">${t.onTvOnce}</div>
+    <div class="card howto">
+      ${step(1, t.step1, t.step1Text)}${step(2, t.step2, t.step2Text)}${step(3, t.step3, isPhone ? t.step3TextPhone : t.step3Text)}
+    </div>`);
   const ip = document.getElementById('ip') as HTMLInputElement;
   ip.addEventListener('keydown', (e) => { if (e.key === 'Enter') connect(ip.value); });
   if (search && !searching) scan();
   showNotice();
 }
 
-async function connect(ip: string) {
-  ip = ip.trim();
-  const err = document.getElementById('err')!;
-  if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) { err.textContent = t.badIp; return; }
-  const go = root.querySelector<HTMLButtonElement>('[data-act=connect]')!;
-  go.disabled = true;
-  go.textContent = t.connecting;
-  err.textContent = t.allow;
-  err.classList.add('calm');
-  try {
-    const d = await api.connect(ip);
-    if (!d.supported) { connectView(tr(d.reason) || t.unsupported, false); return; }
-    device = d;
-    await refresh();
-  } catch (e) {
-    connectView(tr(String(e)), false);
-  }
-}
-
-let found: Found[] | null = null;
-let searching = false;
-let searchError = '';
-
-/** The search results: Fire TVs first, then other devices with ADB open; Google TVs greyed out. */
-function foundList(): string {
-  if (searching && !found?.length) {
-    return `<div class="list"><div class="row small static">${icon.spinner(18)}<span class="name">${t.scanning}</span></div></div>`;
-  }
-  if (searchError) return `<p class="error">${esc(tr(searchError))}</p>`;
-  if (!found) return '';
-  if (!found.length) return `<p class="error calm">${t.scanNone}</p>`;
+/** Found devices as a table: name, model, address, and what can be done with each. */
+function foundTable(): string {
+  const head = `<div class="thead"><span>${t.colName}</span><span>${t.colModel}</span><span>${t.colAddress}</span><span></span></div>`;
+  const note = (text: string) => `${head}<div class="trow empty"><span>${text}</span></div>`;
+  if (searching && !found?.length) return note(t.scanning);
+  if (searchError) return note(esc(tr(searchError)));
+  if (!found) return note(t.scanning);
+  if (!found.length) return note(t.scanNone);
   const row = (d: Found) => {
-    const name = esc(d.name || d.ip);
-    const what = d.model || (d.kind === 'fire' ? t.fireTv : d.vendor);
-    // Without a name the address is the title; it is not repeated underneath.
-    const path = `<span class="path">${[what ? esc(what) : '', d.name ? esc(d.ip) : ''].filter(Boolean).join(' · ')}</span>`;
-    if (d.kind === 'google') {
-      return `<button class="row small" disabled>${icon.tv()}<span class="name">${name}${path}</span><span class="value">${t.notFire}</span></button>`;
-    }
-    if (!d.adb) {
-      return `<button class="row small" data-act="intro">${icon.tv()}<span class="name">${name}${path}</span><span class="value">${t.turnOnAdb}</span>${icon.chevron(18)}</button>`;
-    }
-    return `<button class="row small" data-ip="${esc(d.ip)}">${icon.tv()}<span class="name">${name}${path}</span><span class="value">${t.adbOpen}</span>${icon.chevron(18)}</button>`;
+    const model = d.model || (d.kind === 'fire' ? t.fireTv : d.kind === 'google' ? 'Google TV' : d.vendor || '');
+    const cells = `<span class="nm">${icon.tv(18)}<span>${esc(d.name || d.ip)}</span></span><span class="c2">${esc(model)}</span><span class="c3">${esc(d.ip)}</span>`;
+    if (d.kind === 'google') return `<div class="trow dim">${cells}<span class="c4">${t.unsupported}</span></div>`;
+    if (!d.adb) return `<div class="trow">${cells}<span class="c4">${t.adbIsOff}</span></div>`;
+    return `<div class="trow">${cells}<span class="c4"><button class="btn primary small" data-ip="${esc(d.ip)}">${t.connect}</button></span></div>`;
   };
-  return `<div class="list">${found.map(row).join('')}</div>`;
+  return head + found.map(row).join('');
 }
 
 async function scan() {
@@ -148,7 +134,7 @@ async function scan() {
   const redraw = () => {
     const el = document.getElementById('found');
     if (!el) return; // the screen changed meanwhile
-    el.innerHTML = foundList();
+    el.innerHTML = foundTable();
     const again = root.querySelector<HTMLButtonElement>('[data-act=scan]');
     if (again) again.disabled = searching;
   };
@@ -164,113 +150,138 @@ async function scan() {
   redraw();
 }
 
-// ---------------------------------------------------------------- device
+async function connect(ip: string) {
+  ip = ip.trim();
+  const err = document.getElementById('err')!;
+  if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) { err.textContent = t.badIp; err.classList.remove('calm'); return; }
+  root.querySelectorAll<HTMLButtonElement>('[data-ip], [data-act=connect]').forEach((b) => { b.disabled = true; });
+  const go = root.querySelector<HTMLButtonElement>(`[data-ip="${ip}"]`) ?? root.querySelector<HTMLButtonElement>('[data-act=connect]');
+  if (go) go.textContent = t.connecting;
+  err.textContent = t.allow;
+  err.classList.add('calm');
+  try {
+    const d = await api.connect(ip);
+    if (!d.supported) { connectView(tr(d.reason) || t.unsupported, false); return; }
+    device = d;
+    await refresh();
+  } catch (e) {
+    connectView(tr(String(e)), false);
+  }
+}
+
+// ---------------------------------------------------------------- pages
 
 async function refresh() {
   state = await api.state();
-  open = null;
-  deviceView();
+  showPage(page);
 }
 
-function deviceView() {
+function showPage(p: Page) {
   if (!device || !state) return;
-  view = reopen;
-  const s = state;
+  page = p;
+  view = () => showPage(page);
+  if (p === 'debloat') debloatPage();
+  else if (p === 'ui') uiPage();
+  else if (p === 'restore') restorePage();
+  else overviewPage();
+  root.querySelector('.main')?.scrollTo(0, 0);
+}
+
+const chevron = icon.chevron(16);
+
+function overviewPage() {
+  const s = state!;
   const changed = s.debloated || s.glassUi;
-  frame('device', `
-      <h1>${esc(device.name)}</h1>
-      <p class="sub">${esc(tr(device.fireOs))} · ${esc(device.model)}</p>
-      <div class="list">
-        <button class="row ${open === 'debloat' ? 'on' : ''}" data-act="debloat"><span class="name">${t.debloat}</span>
-          <span class="value">${s.debloated ? t.debloatOn(s.disabled) : t.notApplied}</span>${icon.chevron(18)}</button>
-        <button class="row ${open === 'ui' ? 'on' : ''}" data-act="ui"><span class="name">${t.glassUi}</span>
-          <span class="value">${s.glassUi ? t.installed(esc(s.glassVersion ?? '')) : t.notInstalled}</span>${icon.chevron(18)}</button>
-        <button class="row ${open === 'restore' ? 'on' : ''}" data-act="restore" ${changed ? '' : 'disabled'}><span class="name">${t.restore}</span>
-          <span class="value">${changed ? t.restoreValue : t.nothingToDo}</span>${icon.chevron(18)}</button>
-      </div>
-      <p class="foot">${t.foot}</p>
-      <button class="quiet danger" data-act="adb-off">${icon.shield(16)}${t.adbOff}</button>
-    `);
-}
-
-let slide = true;
-
-/** After a language switch: the same screen again, with its panel standing still if one was open. */
-function reopen() {
-  const was = open;
-  deviceView();
-  slide = false;
-  if (was === 'debloat') debloatPanel();
-  else if (was === 'ui') uiPanel();
-  else if (was === 'restore') restorePanel();
-  slide = true;
-}
-
-/** Opens a panel next to the list as it stands: the left side is not drawn again. */
-function showPanel(key: string, html: string) {
-  open = key;
-  if (shown !== 'device' || !root.querySelector('.side .list')) deviceView();
-  root.querySelectorAll<HTMLElement>('.side .row[data-act]').forEach((r) => r.classList.toggle('on', r.dataset.act === key));
-  root.querySelector('.panel')?.remove();
-  root.insertAdjacentHTML('beforeend', `<div class="panel ${slide ? '' : 'on still'}">${html}</div>`);
-  const panel = root.querySelector<HTMLElement>('.panel')!;
-  if (slide) requestAnimationFrame(() => requestAnimationFrame(() => panel.classList.add('on')));
-  return panel;
-}
-
-/** Slides the panel out; the list stays where it is. */
-function closePanel() {
-  open = null;
-  root.querySelectorAll('.side .row.on').forEach((r) => r.classList.remove('on'));
-  const panel = root.querySelector<HTMLElement>('.panel');
-  if (!panel) return;
-  panel.classList.remove('on', 'still');
-  setTimeout(() => panel.remove(), 320);
-}
-
-const option = (key: string, name: string, value: string) =>
-  `<button class="row small" data-opt="${key}"><span class="name">${name}</span><span class="value">${value}</span></button>`;
-
-async function debloatPanel() {
-  const o: DebloatOptions = { keepPrime: true, keepAlexa: true, keepUpdates: true, dnsFilter: true, remove: [] };
-  const label = (k: keyof DebloatOptions) => (k === 'dnsFilter' ? (o.dnsFilter ? t.on : t.off) : o[k] ? t.keep : t.off);
-  const panel = showPanel('debloat', `
-    <header><h2>${t.debloat}</h2><p>${t.debloatSub}</p></header>
-    <div class="body">
-      ${option('keepPrime', t.primeVideo, label('keepPrime'))}
-      ${option('keepAlexa', t.alexa, label('keepAlexa'))}
-      ${option('keepUpdates', t.updates, label('keepUpdates'))}
-      ${option('dnsFilter', t.dnsFilter, label('dnsFilter'))}
-      <div class="label">${t.yourApps}</div>
-      <div id="apps"><p class="note">${t.readingApps}</p></div>
-      <p class="note">${t.removeNote}</p>
+  const row = (to: Page, name: string, desc: string, value: string, off = false) =>
+    `<button class="row go-row" data-nav="${to}" ${off ? 'disabled' : ''}><span class="t"><span class="n">${name}</span><span class="d">${desc}</span></span><span class="v">${esc(value)}${off ? '' : chevron}</span></button>`;
+  frame(`
+    ${isPhone ? deviceCard() : ''}
+    <h1>${esc(device!.name)}</h1>
+    <p class="sub">${t.foot}</p>
+    <div class="label">${t.onThisTv}</div>
+    <div class="card">
+      ${row('debloat', t.debloat, s.debloated ? t.debloatDescOn(s.disabled) : t.debloatDescOff, s.debloated ? t.on : t.notApplied)}
+      ${row('debloat', t.dnsFilter, s.dnsFilter ? t.filterDescOn : t.filterDescOff, s.dnsFilter ? t.active : t.off)}
+      ${row('ui', t.glassUi, s.glassUi ? t.uiDescOn : t.uiDescOff, s.glassUi ? t.installed(s.glassVersion ?? '') : t.notInstalled)}
+      ${row('restore', t.restore, t.restoreDesc, changed ? '' : t.nothingToDo, !changed)}
     </div>
-    <footer><button class="quiet" data-act="close">${t.cancel}</button><button class="go" data-act="go">${t.start}</button></footer>`);
-  panel.querySelectorAll<HTMLElement>('[data-opt]').forEach((r) => r.addEventListener('click', () => {
+    <div class="label">${t.connection}</div>
+    <div class="card">
+      <div class="row"><span class="t"><span class="n">${t.adbDebugging}</span><span class="d">${t.adbRowDesc}</span></span>
+        <button class="btn rose" data-act="adb-off">${t.turnOff}</button></div>
+    </div>
+    ${isPhone ? credits() : ''}`);
+}
+
+/** A row with a switch; the whole row toggles it. */
+const switchRow = (key: string, name: string, desc: string, on: boolean, extra = '') =>
+  `<button class="row" data-opt="${key}" role="switch" aria-checked="${on}"><span class="t"><span class="n">${name}</span>${desc ? `<span class="d">${desc}</span>` : ''}</span>${extra}<span class="sw ${on ? 'on' : ''}"></span></button>`;
+
+function toggleSwitch(row: HTMLElement, on: boolean) {
+  row.setAttribute('aria-checked', String(on));
+  row.querySelector('.sw')!.classList.toggle('on', on);
+}
+
+/** The page's choices survive a language switch; they start fresh with each connection. */
+let debloatOpts: DebloatOptions | null = null;
+let appList: App[] | null = null;
+
+async function debloatPage() {
+  const o = (debloatOpts ??= { keepPrime: true, keepAlexa: true, keepUpdates: true, dnsFilter: true, remove: [] });
+  frame(`
+    <h1>${t.debloat}</h1>
+    <p class="sub">${t.debloatSub}</p>
+    <div class="label">${t.whatStays}</div>
+    <div class="card">
+      ${switchRow('keepPrime', t.primeVideo, '', o.keepPrime)}
+      ${switchRow('keepAlexa', t.alexa, '', o.keepAlexa)}
+      ${switchRow('keepUpdates', t.updates, '', o.keepUpdates)}
+      ${switchRow('dnsFilter', t.dnsFilter, t.filterDescOn, o.dnsFilter)}
+    </div>
+    <div class="label">${t.yourApps}</div>
+    <div class="card" id="apps">${appRows(o)}</div>
+    <p class="note">${t.removeNote}</p>`,
+    `<span class="note">${t.debloatNote}</span><button class="btn primary" data-act="go">${t.start}</button>`);
+  root.querySelectorAll<HTMLElement>('[data-opt]').forEach((r) => r.addEventListener('click', () => {
     const k = r.dataset.opt as 'keepPrime' | 'keepAlexa' | 'keepUpdates' | 'dnsFilter';
     o[k] = !o[k];
-    r.querySelector('.value')!.textContent = label(k);
+    toggleSwitch(r, o[k]);
   }));
-  panel.querySelector('[data-act=go]')!.addEventListener('click', () => run(panel, t.debloat, (s) => api.debloat(o, s)));
-  const apps: App[] = await api.apps().catch(() => []);
-  const box = panel.querySelector('#apps');
-  if (!box || !panel.isConnected) return;
-  box.innerHTML = apps.length
-    ? apps.map((a) => `<button class="row small" data-app="${esc(a.pkg)}"><span class="name">${esc(a.label)}<span class="path mono">${esc(a.pkg)}</span></span><span class="value">${t.stays}</span></button>`).join('')
-    : `<p class="note">${t.noApps}</p>`;
-  panel.querySelectorAll<HTMLElement>('[data-app]').forEach((r) => r.addEventListener('click', () => {
+  root.querySelector('[data-act=go]')!.addEventListener('click', () => run(t.debloat, (s) => api.debloat(o, s)));
+  if (!appList) {
+    appList = await api.apps().catch(() => []);
+    const box = document.getElementById('apps');
+    if (box && page === 'debloat') box.innerHTML = appRows(o);
+  }
+  bindApps(o);
+}
+
+function appRows(o: DebloatOptions): string {
+  if (!appList) return `<div class="row"><span class="t"><span class="d">${t.readingApps}</span></span></div>`;
+  if (!appList.length) return `<div class="row"><span class="t"><span class="d">${t.noApps}</span></span></div>`;
+  return appList.map((a) => {
+    const gone = o.remove.includes(a.pkg);
+    return `<button class="row app" data-app="${esc(a.pkg)}" role="switch" aria-checked="${gone}">
+      <span class="t"><span class="n">${esc(a.label)}</span><span class="d mono">${esc(a.pkg)}</span></span>
+      <span class="v ${gone ? 'rose' : ''}">${gone ? t.removeApp : t.stays}</span><span class="sw rose ${gone ? 'on' : ''}"></span></button>`;
+  }).join('');
+}
+
+function bindApps(o: DebloatOptions) {
+  root.querySelectorAll<HTMLElement>('[data-app]').forEach((r) => r.addEventListener('click', () => {
     const pkg = r.dataset.app!;
     const gone = !o.remove.includes(pkg);
     o.remove = gone ? [...o.remove, pkg] : o.remove.filter((p) => p !== pkg);
-    const v = r.querySelector('.value')!;
-    v.textContent = gone ? t.remove : t.stays;
-    v.classList.toggle('remove', gone);
+    toggleSwitch(r, gone);
+    const v = r.querySelector('.v')!;
+    v.textContent = gone ? t.removeApp : t.stays;
+    v.classList.toggle('rose', gone);
   }));
 }
 
 /**
  * A picked photo as the TV wants it: cropped to 16:9 from the middle (like the launcher's own
- * photos), scaled to 1920 x 1080, JPEG; plus a small preview for the panel.
+ * photos), scaled to 1920 x 1080, JPEG; plus a small preview for the page.
  */
 async function tvPhoto(f: File): Promise<{ jpeg: Uint8Array; thumb: string }> {
   const bmp = await createImageBitmap(f);
@@ -289,53 +300,59 @@ async function tvPhoto(f: File): Promise<{ jpeg: Uint8Array; thumb: string }> {
   return { jpeg: new Uint8Array(await blob.arrayBuffer()), thumb };
 }
 
-function uiPanel() {
-  const o: UiOptions = { layout: state?.layout ?? 'dock', tiles: state?.tiles ?? 'original', theme: state?.theme ?? 'neutral', arrows: state?.arrows ?? false };
+let uiOpts: UiOptions | null = null;
+let photoThumb = '';
+
+function uiPage() {
+  const s = state!;
+  const o = (uiOpts ??= { layout: s.layout ?? 'dock', tiles: s.tiles ?? 'original', theme: s.theme ?? 'neutral', arrows: s.arrows ?? false });
   const thumbs: Record<UiOptions['layout'], string> = {
-    dock: '<i class="g" style="left:14%;right:14%;bottom:9px;height:20px"></i><i style="left:20%;bottom:13px;width:14%;height:12px"></i><i style="left:37%;bottom:13px;width:14%;height:12px"></i><i style="left:54%;bottom:13px;width:14%;height:12px"></i>',
-    list: '<i class="g" style="left:9px;top:10px;width:58%;height:15px"></i><i style="left:13px;top:13px;width:14px;height:9px"></i><i style="left:13px;top:31px;width:14px;height:9px;opacity:.6"></i><i style="left:13px;top:49px;width:14px;height:9px;opacity:.6"></i>',
-    icons: '<i style="left:12px;top:10px;width:22px;height:13px"></i><i style="left:12px;top:29px;width:22px;height:13px;opacity:.6"></i><i style="left:12px;top:48px;width:22px;height:13px;opacity:.6"></i><i style="left:48%;top:26px;width:32%;height:9px"></i>',
+    dock: '<i class="g" style="left:13%;right:13%;bottom:12%;height:24%"></i><i style="left:19%;bottom:17%;width:15%;height:14%"></i><i style="left:37%;bottom:17%;width:15%;height:14%"></i><i style="left:55%;bottom:17%;width:15%;height:14%"></i>',
+    list: '<i class="g" style="left:6%;top:13%;width:58%;height:18%"></i><i style="left:9%;top:17%;width:9%;height:10%"></i><i style="left:9%;top:39%;width:9%;height:10%;opacity:.6"></i><i style="left:9%;top:61%;width:9%;height:10%;opacity:.6"></i>',
+    icons: '<i style="left:8%;top:13%;width:15%;height:15%"></i><i style="left:8%;top:36%;width:15%;height:15%;opacity:.6"></i><i style="left:8%;top:59%;width:15%;height:15%;opacity:.6"></i><i style="left:47%;top:33%;width:32%;height:10%"></i>',
   };
-  const tilesLabel = () => (o.tiles === 'glass' ? t.glassSymbols : t.originalBanners);
-  const panel = showPanel('ui', `
-    <header><h2>${t.glassUi}</h2><p>${t.uiSub}</p></header>
-    <div class="body">
-      <div class="label">${t.layout}</div>
-      <div class="choices">${(Object.keys(thumbs) as UiOptions['layout'][]).map((k) =>
-        `<button class="choice ${k === o.layout ? 'on' : ''}" data-layout="${k}"><div class="thumb">${thumbs[k]}</div><span>${t[k]}</span></button>`).join('')}</div>
-      <div class="label">${t.colours}</div>
-      <div class="swatches">${THEMES.map((k) =>
-        `<button class="choice swatch ${k === o.theme ? 'on' : ''}" data-theme="${k}"><div class="thumb sw-${k}"><i class="g"></i><i class="f"></i></div><span>${t.themeName[k]}</span></button>`).join('')}</div>
-      <p class="note">${t.coloursNote}</p>
-      <div class="label">${t.wallpaper}</div>
-      <div class="photo-pick">
-        <button class="photo-prev" id="photoPrev" data-act="pick-photo" aria-label="${t.choosePhoto}" title="${t.choosePhoto}">
-          <span class="photo-img"></span><span class="photo-hover">${icon.upload(22)}</span>
-        </button>
-        <p class="photo-status" id="photoStatus">${isPhone ? t.photoNotePhone : t.photoNote}</p>
-        <input type="file" id="photoFile" accept="image/jpeg,image/png,image/webp" hidden>
-      </div>
-      <div class="label">${t.tiles}</div>
-      ${option('tiles', t.look, tilesLabel())}
-      ${option('arrows', t.dockArrows, o.arrows ? t.on : t.off)}
-    </div>
-    <footer><button class="quiet" data-act="close">${t.cancel}</button><button class="go" data-act="go">${state?.glassUi ? t.update : t.install}</button></footer>`);
-  panel.querySelectorAll<HTMLElement>('[data-layout]').forEach((b) => b.addEventListener('click', () => {
-    o.layout = b.dataset.layout as UiOptions['layout'];
-    panel.querySelectorAll('[data-layout]').forEach((x) => x.classList.toggle('on', x === b));
-  }));
-  panel.querySelectorAll<HTMLElement>('[data-theme]').forEach((b) => b.addEventListener('click', () => {
-    o.theme = b.dataset.theme as Theme;
-    panel.querySelectorAll('[data-theme]').forEach((x) => x.classList.toggle('on', x === b));
-  }));
-  const file = panel.querySelector<HTMLInputElement>('#photoFile')!;
-  panel.querySelector('[data-act=pick-photo]')!.addEventListener('click', () => file.click());
+  const tile = (k: UiOptions['tiles'], name: string) => `<button data-tiles="${k}" class="${o.tiles === k ? 'on' : ''}">${name}</button>`;
+  frame(`
+    <h1>${t.glassUi}</h1>
+    <p class="sub">${t.uiSub}</p>
+    <div class="label">${t.layout}</div>
+    <div class="layouts">${(Object.keys(thumbs) as UiOptions['layout'][]).map((k) =>
+      `<button class="lay ${k === o.layout ? 'on' : ''}" data-layout="${k}"><span class="th">${thumbs[k]}</span><span class="nm">${t[k]}</span></button>`).join('')}</div>
+    <div class="label">${t.appearance}</div>
+    <div class="card">
+      <div class="row wrap"><span class="t"><span class="n">${t.colours}</span><span class="d">${t.coloursShort}</span></span>
+        <span class="chips">${THEMES.map((k) =>
+          `<button class="chip ${k === o.theme ? 'on' : ''}" data-theme="${k}"><span class="c sw-${k}"><i class="g"></i><i class="f"></i></span>${t.themeName[k]}</button>`).join('')}</span></div>
+      <div class="row wrap"><span class="t"><span class="n">${t.wallpaper}</span><span class="d" id="photoStatus">${t.wallpaperDesc}</span></span>
+        <button class="photo" data-act="pick-photo" aria-label="${t.choose}">${photoThumb ? `<img src="${photoThumb}" alt="">` : icon.image(20)}</button>
+        <button class="btn" data-act="pick-photo">${icon.upload(15)}${t.choose}</button>
+        <input type="file" id="photoFile" accept="image/jpeg,image/png,image/webp" hidden></div>
+      <div class="row wrap"><span class="t"><span class="n">${t.tiles}</span><span class="d">${t.tilesDesc}</span></span>
+        <span class="seg">${tile('original', t.originalBanners)}${tile('glass', t.glassSymbols)}</span></div>
+      ${switchRow('arrows', t.dockArrows, t.arrowsDesc, o.arrows)}
+    </div>`,
+    `<span class="note">${s.glassUi ? t.uiNoteUpdate : t.uiNoteInstall}</span><button class="btn primary" data-act="go">${s.glassUi ? t.update : t.install}</button>`);
+
+  const pick = (sel: string, attr: string, set: (v: string) => void) =>
+    root.querySelectorAll<HTMLElement>(sel).forEach((b) => b.addEventListener('click', () => {
+      set(b.getAttribute(attr)!);
+      root.querySelectorAll(sel).forEach((x) => x.classList.toggle('on', x === b));
+    }));
+  pick('[data-layout]', 'data-layout', (v) => { o.layout = v as UiOptions['layout']; });
+  pick('[data-theme]', 'data-theme', (v) => { o.theme = v as Theme; });
+  pick('[data-tiles]', 'data-tiles', (v) => { o.tiles = v as UiOptions['tiles']; });
+  root.querySelector<HTMLElement>('[data-opt=arrows]')!.addEventListener('click', (e) => {
+    o.arrows = !o.arrows;
+    toggleSwitch(e.currentTarget as HTMLElement, o.arrows);
+  });
+
+  const file = root.querySelector<HTMLInputElement>('#photoFile')!;
+  root.querySelectorAll('[data-act=pick-photo]').forEach((b) => b.addEventListener('click', () => file.click()));
   file.addEventListener('change', async () => {
     const f = file.files?.[0];
     file.value = '';
     if (!f) return;
-    const status = panel.querySelector('#photoStatus')!;
-    const prev = panel.querySelector<HTMLElement>('#photoPrev')!;
+    const status = root.querySelector('#photoStatus')!;
     status.classList.remove('bad');
     let photo: { jpeg: Uint8Array; thumb: string };
     try {
@@ -345,11 +362,11 @@ function uiPanel() {
       status.classList.add('bad');
       return;
     }
-    prev.querySelector('.photo-img')!.innerHTML = `<img src="${photo.thumb}" alt="">`;
-    prev.classList.add('has');
+    photoThumb = photo.thumb;
+    root.querySelector('.photo')!.innerHTML = `<img src="${photo.thumb}" alt="">`;
     // Auto takes its colour from this photo; Lavender would hide it behind its colour field.
     o.theme = 'auto';
-    panel.querySelectorAll<HTMLElement>('[data-theme]').forEach((x) => x.classList.toggle('on', x.dataset.theme === 'auto'));
+    root.querySelectorAll<HTMLElement>('[data-theme]').forEach((x) => x.classList.toggle('on', x.dataset.theme === 'auto'));
     status.textContent = t.sendingPhoto;
     try {
       await api.setWallpaper(photo.jpeg, o.theme);
@@ -359,123 +376,138 @@ function uiPanel() {
       status.classList.add('bad');
     }
   });
-  panel.querySelector('[data-opt=tiles]')!.addEventListener('click', (e) => {
-    o.tiles = o.tiles === 'original' ? 'glass' : 'original';
-    (e.currentTarget as HTMLElement).querySelector('.value')!.textContent = tilesLabel();
-  });
-  panel.querySelector('[data-opt=arrows]')!.addEventListener('click', (e) => {
-    o.arrows = !o.arrows;
-    (e.currentTarget as HTMLElement).querySelector('.value')!.textContent = o.arrows ? t.on : t.off;
-  });
-  panel.querySelector('[data-act=go]')!.addEventListener('click', () => run(panel, t.glassUi, (s) => api.installUi(o, s)));
+  root.querySelector('[data-act=go]')!.addEventListener('click', () => run(t.glassUi, (st) => api.installUi(o, st)));
 }
 
-/** The danger button's dialog: what turning ADB off gives, what keeps working, how to undo it. */
-function adbOffPanel() {
-  const panel = showPanel('adb-off', `
-    <header><h2>${t.adbOffTitle}</h2><p>${t.adbOffSub}</p></header>
-    <div class="body">
-      <div class="step">${icon.check(16)}${t.adbOffKeeps}</div>
-      <div class="step warn">${icon.info(16)}${t.adbOffAfter}</div>
+function restorePage() {
+  const line = (s: string) => `<div class="row"><span class="t"><span class="n plain">${s}</span></span></div>`;
+  frame(`
+    <h1>${t.restore}</h1>
+    <p class="sub">${t.restoreSub}</p>
+    <div class="label">${t.willHappen}</div>
+    <div class="card">${line(t.restoreHome)}${line(t.restorePackages)}${line(t.restoreSettings)}${line(t.restoreFilter)}</div>
+    <p class="note">${t.restoreNote}</p>`,
+    `<span class="note">${t.debloatNote}</span><button class="btn primary" data-act="go">${t.restore}</button>`);
+  root.querySelector('[data-act=go]')!.addEventListener('click', () => run(t.restore, (s) => api.restore(s)));
+}
+
+// ---------------------------------------------------------------- a running task
+
+const stepIcon: Record<Step['state'], () => string> = {
+  pending: () => '<span class="ic"></span>',
+  running: () => icon.arrow(17),
+  done: () => icon.check(17),
+  failed: () => icon.cross(17),
+  skipped: () => icon.minus(17),
+};
+
+/** The page turns into the steps of the task; the other pages wait until it is done. */
+async function run(title: string, task: (onStep: (s: Step) => void) => Promise<boolean>) {
+  busy = true;
+  view = () => {};
+  frame(`
+    <h1>${esc(title)}</h1>
+    <p class="sub">${isPhone ? t.keepOpen : t.keepOn}</p>
+    <div class="label">${t.steps}</div>
+    <div class="card" id="steps"></div>
+    <div class="progress"><span class="track"><i id="bar"></i></span><span id="stepOf"></span></div>
+    <p class="summary" id="summary"></p>`,
+    `<span class="note">${t.runNote}</span><button class="btn primary" data-act="done" disabled>${t.done}</button>`);
+  const steps = new Map<string, Step>();
+  const list = root.querySelector('#steps')!;
+  const draw = () => {
+    const all = [...steps.values()];
+    list.innerHTML = all.map((s) =>
+      `<div class="step ${s.state}">${stepIcon[s.state]()}<span>${esc(tr(s.label))}</span>${s.detail ? `<span class="v">${esc(tr(s.detail))}</span>` : ''}</div>`).join('');
+    const finished = all.filter((s) => s.state !== 'pending' && s.state !== 'running').length;
+    const now = all.findIndex((s) => s.state === 'running');
+    (root.querySelector('#bar') as HTMLElement).style.width = `${all.length ? (finished / all.length) * 100 : 0}%`;
+    root.querySelector('#stepOf')!.textContent = all.length ? t.stepOf(now >= 0 ? now + 1 : finished, all.length) : '';
+  };
+  const summary = root.querySelector('#summary')!;
+  try {
+    const ok = await task((s) => { steps.set(s.id, s); draw(); });
+    summary.textContent = ok ? t.allGood : t.someFailed;
+    summary.classList.toggle('bad', !ok);
+  } catch (e) {
+    summary.textContent = tr(String(e));
+    summary.classList.add('bad');
+  }
+  busy = false;
+  appList = null;
+  // The sidebar unlocks; the steps stay on screen until Done.
+  const side = root.querySelector('.side');
+  if (side) side.outerHTML = sidebar();
+  root.querySelector<HTMLButtonElement>('[data-act=done]')!.disabled = false;
+}
+
+// ---------------------------------------------------------------- the ADB dialog
+
+/** Turning ADB off: what it gives, what keeps working, how to undo it. */
+function adbOffDialog() {
+  root.insertAdjacentHTML('beforeend', `
+    <div class="scrim"><div class="dialog" role="dialog" aria-modal="true">
+      <h2>${t.adbOffTitle}</h2>
+      <p class="sub">${t.adbOffSub}</p>
+      <div class="facts"><div>${icon.check(16)}${t.adbOffKeeps}</div><div class="rose">${icon.info(16)}${t.adbOffAfter}</div></div>
       <p class="note">${t.adbOffBack}</p>
-      <p class="summary bad" id="adbErr"></p>
-    </div>
-    <footer><button class="quiet" data-act="close">${t.cancel}</button><button class="go danger" data-act="go">${t.adbOffGo}</button></footer>`);
-  const go = panel.querySelector<HTMLButtonElement>('[data-act=go]')!;
+      <p class="error" id="adbErr"></p>
+      <div class="dialog-actions"><button class="btn" data-act="close">${t.cancel}</button><button class="btn danger" data-act="adb-go">${t.adbOffGo}</button></div>
+    </div></div>`);
+  const go = root.querySelector<HTMLButtonElement>('[data-act=adb-go]')!;
   go.addEventListener('click', async () => {
     go.disabled = true;
     go.textContent = t.adbOffBusy;
     try {
       await api.adbOff();
-      device = null;
-      state = null;
-      open = null;
+      closeDialog();
       connectView(t.adbOffDone, false);
       document.getElementById('err')?.classList.add('calm');
     } catch (e) {
-      panel.querySelector('#adbErr')!.textContent = tr(String(e));
+      root.querySelector('#adbErr')!.textContent = tr(String(e));
       go.disabled = false;
       go.textContent = t.adbOffGo;
     }
   });
 }
 
-function restorePanel() {
-  const line = (s: string) => `<div class="step">${icon.chevron(16)}${s}</div>`;
-  const panel = showPanel('restore', `
-    <header><h2>${t.restore}</h2><p>${t.restoreSub}</p></header>
-    <div class="body">
-      ${line(t.restoreHome)}${line(t.restorePackages)}${line(t.restoreSettings)}${line(t.restoreFilter)}
-      <p class="note" style="margin-top:14px">${t.restoreNote}</p>
-    </div>
-    <footer><button class="quiet" data-act="close">${t.cancel}</button><button class="go" data-act="go">${t.restore}</button></footer>`);
-  panel.querySelector('[data-act=go]')!.addEventListener('click', () => run(panel, t.restore, (s) => api.restore(s)));
-}
-
-const stepIcon: Record<Step['state'], () => string> = {
-  pending: () => '<span class="ic"></span>',
-  running: () => icon.spinner(18),
-  done: () => icon.check(18),
-  failed: () => icon.cross(18),
-  skipped: () => icon.minus(18),
-};
-
-/** The panel turns into the steps of the running task. */
-async function run(panel: HTMLElement, title: string, task: (onStep: (s: Step) => void) => Promise<boolean>) {
-  view = () => {};
-  const steps = new Map<string, Step>();
-  panel.innerHTML = `
-    <header><h2>${esc(title)}</h2><p>${isPhone ? t.keepOpen : t.keepOn}</p></header>
-    <div class="body"><div id="steps"></div><div id="summary"></div></div>
-    <footer><button class="go" data-act="done" disabled>${t.done}</button></footer>`;
-  const list = panel.querySelector('#steps')!;
-  const draw = () => {
-    list.innerHTML = [...steps.values()].map((s) =>
-      `<div class="step ${s.state}">${stepIcon[s.state]()}${esc(tr(s.label))}${s.detail ? `<span class="detail">${esc(tr(s.detail))}</span>` : ''}</div>`).join('');
-  };
-  const summary = panel.querySelector('#summary')!;
-  try {
-    const ok = await task((s) => { steps.set(s.id, s); draw(); });
-    summary.outerHTML = ok ? `<p class="summary">${t.allGood}</p>` : `<p class="summary bad">${t.someFailed}</p>`;
-  } catch (e) {
-    summary.outerHTML = `<p class="summary bad">${esc(tr(String(e)))}</p>`;
-  }
-  panel.querySelector<HTMLButtonElement>('[data-act=done]')!.disabled = false;
+function closeDialog() {
+  root.querySelector('.scrim')?.remove();
 }
 
 // ---------------------------------------------------------------- events
 
 root.addEventListener('click', (e) => {
-  const el = (e.target as HTMLElement).closest<HTMLElement>('[data-act], [data-ip], [data-lang], [data-win], [data-gh]');
+  const el = (e.target as HTMLElement).closest<HTMLElement>('[data-act], [data-ip], [data-lang], [data-win], [data-gh], [data-nav]');
   const menu = root.querySelector('.lang');
   if (el?.dataset.act !== 'lang-menu') menu?.classList.remove('open');
-  if (!el) return;
+  if ((e.target as HTMLElement).classList.contains('scrim')) { closeDialog(); return; }
+  if (!el || (el as HTMLButtonElement).disabled) return;
   if (el.dataset.win) { windowAction(el.dataset.win); return; }
   if (el.dataset.gh) { openGithub(el.dataset.gh); return; }
   if (el.dataset.ip) { connect(el.dataset.ip); return; }
+  if (el.dataset.nav) { if (!busy) showPage(el.dataset.nav as Page); return; }
   if (el.dataset.lang) {
     if (el.dataset.lang !== lang) { setLang(el.dataset.lang as Lang); view(); }
     return;
   }
   switch (el.dataset.act) {
     case 'lang-menu': menu?.classList.toggle('open'); break;
-    case 'intro': introView(); break;
-    case 'intro-done': try { localStorage.setItem(INTRO, '1'); } catch { /* storage may be off */ } connectView(); break;
     case 'connect': connect((document.getElementById('ip') as HTMLInputElement).value); break;
     case 'scan': scan(); break;
-    case 'disconnect': api.disconnect().then(() => connectView()); break;
-    case 'debloat': debloatPanel(); break;
-    case 'ui': uiPanel(); break;
-    case 'restore': restorePanel(); break;
-    case 'adb-off': adbOffPanel(); break;
-    case 'close': closePanel(); break;
-    case 'done': closePanel(); setTimeout(refresh, 320); break;
+    case 'disconnect':
+      debloatOpts = null; uiOpts = null; appList = null; photoThumb = '';
+      api.disconnect().then(() => connectView());
+      break;
+    case 'adb-off': adbOffDialog(); break;
+    case 'close': closeDialog(); break;
+    case 'done': page = 'overview'; refresh(); break;
   }
 });
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   root.querySelector('.lang')?.classList.remove('open');
-  if (open && !root.querySelector('.panel [data-act=done]')) closePanel();
+  closeDialog();
 });
 document.addEventListener('click', (e) => { if (!root.contains(e.target as Node)) root.querySelector('.lang')?.classList.remove('open'); });
 
@@ -510,6 +542,8 @@ document.addEventListener('mousedown', (e) => { if (!ctx.contains(e.target as No
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideCtx(); });
 window.addEventListener('blur', hideCtx);
 
+// ---------------------------------------------------------------- start
+
 /** After a start: says which task the last run did not finish, on the connect screen. */
 async function noteUnfinished() {
   const u = await api.unfinished().catch(() => null);
@@ -519,8 +553,6 @@ async function noteUnfinished() {
   showNotice();
 }
 
-/** The note about an unfinished task waits for the connect screen (the intro may come first). */
-let notice = '';
 function showNotice() {
   const err = document.getElementById('err');
   if (!notice || !err || err.textContent) return;
@@ -530,7 +562,6 @@ function showNotice() {
 }
 
 splash(() => {
-  if (introSeen()) connectView();
-  else introView();
+  connectView();
   void noteUnfinished();
 });

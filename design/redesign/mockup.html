@@ -1,0 +1,260 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>
+@font-face { font-family: Roboto; src: url(file:///C:/prj/glass-home/tool/public/roboto.ttf); font-weight: 100 900; }
+:root {
+  --ink: #1b2233; --mute: rgba(27,34,51,.64); --faint: rgba(27,34,51,.44); --line: rgba(27,34,51,.08);
+  --warn: #b23f66; --ok: #3f8f86;
+  --card: linear-gradient(175deg, rgba(255,255,255,.74), rgba(255,255,255,.56));
+  --edge: inset 0 1px 0 rgba(255,255,255,.9), inset 0 0 0 1px rgba(255,255,255,.4), 0 14px 34px -26px rgba(58,68,128,.45);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #23272f; padding: 36px; display: grid; gap: 36px; width: max-content; font: 14px/1.45 Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+.cap { color: #e7eaf2; font-size: 16px; font-weight: 550; margin-bottom: 12px; } .cap small { color: #a4abbb; font-weight: 400; margin-left: 10px; font-size: 14px; }
+svg { display: block; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+.win { position: relative; width: 1180px; height: 760px; border-radius: 12px; overflow: hidden; color: var(--ink); background: #e6eaf6; box-shadow: 0 30px 80px rgba(0,0,0,.45); }
+.sky { position: absolute; inset: 0; background:
+  radial-gradient(48% 62% at 12% 18%, rgba(169,159,240,.26), transparent 72%),
+  radial-gradient(42% 55% at 46% 4%, rgba(127,151,230,.18), transparent 70%),
+  radial-gradient(50% 60% at 92% 88%, rgba(143,216,200,.30), transparent 72%),
+  linear-gradient(315deg, #dff4ee, #e7ecf8 50%, #e4defa); }
+
+/* title bar: only the language and the window buttons; the name lives in the sidebar */
+.bar { position: absolute; top: 0; right: 0; height: 44px; display: flex; align-items: center; gap: 2px; padding-right: 6px; z-index: 3; color: var(--mute); }
+.bar .lang { display: flex; align-items: center; gap: 5px; font-size: 13px; padding: 0 10px; margin-right: 8px; }
+.bar .wb { width: 40px; height: 30px; display: grid; place-items: center; }
+
+/* sidebar */
+.side { position: absolute; left: 0; top: 0; bottom: 0; width: 248px; padding: 0 12px 12px; display: flex; flex-direction: column; z-index: 2;
+  background: linear-gradient(180deg, rgba(255,255,255,.50), rgba(255,255,255,.30)); border-right: 1px solid var(--line); }
+.brand { height: 44px; display: flex; align-items: center; gap: 9px; padding: 0 8px; font-weight: 560; font-size: 13.5px; }
+.device { margin-top: 10px; padding: 12px; border-radius: 12px; background: var(--card); box-shadow: var(--edge); display: flex; gap: 11px; align-items: center; }
+.device .ic { color: var(--mute); }
+.device .n { font-weight: 560; font-size: 14px; line-height: 1.25; }
+.device .m { font-size: 12.5px; color: var(--mute); }
+.device .x { margin-left: auto; color: var(--faint); }
+.nav { margin-top: 14px; display: grid; gap: 2px; }
+.nav a { height: 36px; border-radius: 9px; display: flex; align-items: center; gap: 11px; padding: 0 10px; font-size: 14px; color: var(--mute); }
+.nav a svg { color: var(--faint); }
+.nav a .s { margin-left: auto; font-size: 12.5px; color: var(--faint); font-variant-numeric: tabular-nums; }
+.nav a.on { background: rgba(255,255,255,.86); box-shadow: inset 0 1px 0 #fff, 0 6px 16px -12px rgba(58,68,128,.5); color: var(--ink); font-weight: 520; }
+.nav a.on svg { color: var(--ink); }
+.side .grow { flex: 1; }
+.side .danger { height: 36px; display: flex; align-items: center; gap: 11px; padding: 0 10px; font-size: 13.5px; color: var(--warn); }
+.side .meta { margin-top: 8px; padding: 12px 10px 2px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--faint); display: flex; align-items: center; gap: 8px; }
+.side .meta span + span::before { content: "·"; margin-right: 8px; }
+
+/* main */
+.main { position: absolute; left: 248px; right: 0; top: 0; bottom: 0; padding: 60px 56px 0; }
+.main.wide { left: 0; padding: 60px 0 0; }
+.col { width: 760px; margin: 0 auto; }
+h1 { font-size: 26px; font-weight: 500; letter-spacing: -.4px; line-height: 1.2; }
+.sub { margin-top: 6px; color: var(--mute); font-size: 14px; max-width: 560px; }
+.label { margin: 26px 2px 9px; font-size: 11.5px; font-weight: 560; letter-spacing: .8px; text-transform: uppercase; color: var(--faint); }
+.card { border-radius: 14px; background: var(--card); box-shadow: var(--edge); }
+.row { min-height: 54px; display: flex; align-items: center; gap: 16px; padding: 10px 16px 10px 18px; }
+.row + .row { border-top: 1px solid var(--line); }
+.row .t { flex: 1; min-width: 0; }
+.row .n { font-size: 14.5px; font-weight: 520; letter-spacing: -.1px; }
+.row .d { font-size: 12.5px; color: var(--mute); margin-top: 1px; }
+.row .v { font-size: 13.5px; color: var(--mute); display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.row .v svg { color: var(--faint); }
+.row.dim { color: var(--faint); } .row.dim .d, .row.dim .v { color: var(--faint); }
+
+.btn { height: 34px; padding: 0 14px; border-radius: 9px; display: inline-flex; align-items: center; gap: 7px; font-size: 13.5px; font-weight: 520;
+  background: rgba(255,255,255,.78); box-shadow: inset 0 0 0 1px rgba(27,34,51,.12), 0 1px 0 rgba(255,255,255,.9); white-space: nowrap; }
+.btn.primary { height: 38px; padding: 0 20px; background: var(--ink); color: #f7f8fc; font-weight: 550; font-size: 14px; box-shadow: none; }
+.btn.small { height: 30px; padding: 0 12px; font-size: 13px; }
+.btn.rose { color: var(--warn); }
+.link { color: var(--mute); font-size: 13.5px; display: inline-flex; align-items: center; gap: 6px; }
+
+.seg { display: inline-flex; padding: 3px; border-radius: 10px; background: rgba(27,34,51,.07); }
+.seg span { height: 28px; padding: 0 12px; border-radius: 7px; display: flex; align-items: center; font-size: 13px; color: var(--mute); }
+.seg span.on { background: #fff; color: var(--ink); font-weight: 520; box-shadow: 0 1px 3px rgba(27,34,51,.14); }
+.sw { width: 36px; height: 20px; border-radius: 10px; background: rgba(27,34,51,.2); position: relative; }
+.sw::after { content: ""; position: absolute; left: 2px; top: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(27,34,51,.3); }
+.sw.on { background: var(--ink); } .sw.on::after { left: 18px; }
+
+/* action bar */
+.actions { position: absolute; left: 0; right: 0; bottom: 0; height: 66px; padding: 0 56px; display: flex; align-items: center; gap: 12px;
+  border-top: 1px solid var(--line); background: rgba(255,255,255,.34); }
+.actions .note { font-size: 13px; color: var(--mute); margin-right: auto; }
+
+/* layout choices */
+.layouts { display: flex; gap: 14px; }
+.lay { width: 176px; }
+.lay .th { height: 99px; border-radius: 10px; position: relative; overflow: hidden; background: url(file:///C:/prj/glass-home/tool/public/wall.jpg) 50% 50% / cover; box-shadow: 0 0 0 1px rgba(27,34,51,.1); }
+.lay .th::after { content: ""; position: absolute; inset: 0; background: rgba(6,8,10,.25); }
+.lay .th i { position: absolute; z-index: 1; border-radius: 3px; background: rgba(246,241,231,.86); }
+.lay .th i.g { background: rgba(255,255,255,.24); box-shadow: inset 0 1px 0 rgba(255,255,255,.35); }
+.lay.on .th { box-shadow: 0 0 0 2px #f1f3fa, 0 0 0 4px var(--ink); }
+.lay .nm { margin-top: 9px; font-size: 13.5px; color: var(--mute); display: flex; align-items: center; gap: 6px; }
+.lay.on .nm { color: var(--ink); font-weight: 520; }
+
+.chips { display: flex; gap: 8px; }
+.chip { width: 54px; text-align: center; font-size: 11.5px; color: var(--mute); }
+.chip .c { height: 34px; border-radius: 8px; position: relative; overflow: hidden; margin-bottom: 4px; background: url(file:///C:/prj/glass-home/tool/public/wall.jpg) 50% 60% / cover; box-shadow: 0 0 0 1px rgba(27,34,51,.1); }
+.chip .c i { position: absolute; top: 11px; height: 12px; border-radius: 3px; }
+.chip .c i.g { left: 8px; width: 16px; } .chip .c i.f { left: 28px; width: 18px; }
+.chip.on { color: var(--ink); font-weight: 520; }
+.chip.on .c { box-shadow: 0 0 0 2px #f4f5fb, 0 0 0 3.5px var(--ink); }
+.photo { width: 96px; height: 54px; border-radius: 8px; background: url(file:///C:/prj/glass-home/tool/public/wall.jpg) 50% 60% / cover; box-shadow: 0 0 0 1px rgba(27,34,51,.1); }
+
+/* device table */
+.thead, .trow { display: grid; grid-template-columns: 1.5fr 1.1fr 1fr 150px; align-items: center; gap: 12px; padding: 0 12px 0 18px; }
+.thead { height: 36px; font-size: 11.5px; font-weight: 560; letter-spacing: .7px; text-transform: uppercase; color: var(--faint); border-bottom: 1px solid var(--line); }
+.trow { height: 52px; font-size: 14px; }
+.trow + .trow { border-top: 1px solid var(--line); }
+.trow .nm { font-weight: 520; display: flex; align-items: center; gap: 11px; } .trow .nm svg { color: var(--faint); }
+.trow .c2, .trow .c3 { color: var(--mute); font-variant-numeric: tabular-nums; }
+.trow .c4 { justify-self: end; color: var(--mute); font-size: 13.5px; }
+.trow.sel { background: rgba(255,255,255,.7); }
+.trow.dim { color: var(--faint); } .trow.dim .c2, .trow.dim .c3, .trow.dim .c4 { color: var(--faint); }
+.under { margin-top: 14px; display: flex; align-items: center; gap: 18px; }
+.field { height: 38px; width: 220px; border-radius: 9px; padding: 0 12px; display: flex; align-items: center; font-size: 14px; color: var(--faint);
+  background: rgba(255,255,255,.78); box-shadow: inset 0 0 0 1px rgba(27,34,51,.12); font-variant-numeric: tabular-nums; }
+.howto { display: grid; grid-template-columns: repeat(3, 1fr); }
+.howto div { padding: 14px 18px; font-size: 13px; color: var(--mute); } .howto div + div { border-left: 1px solid var(--line); }
+.howto b { display: block; color: var(--ink); font-weight: 520; font-size: 13.5px; margin-bottom: 2px; }
+.howto em { font-style: normal; color: var(--faint); font-variant-numeric: tabular-nums; margin-right: 8px; }
+
+/* run */
+.step { height: 46px; display: flex; align-items: center; gap: 13px; padding: 0 18px; font-size: 14.5px; }
+.step + .step { border-top: 1px solid var(--line); }
+.step .v { margin-left: auto; font-size: 13px; color: var(--mute); }
+.step svg { color: var(--ok); } .step.now svg { color: var(--ink); } .step.wait { color: var(--faint); } .step.wait svg { color: transparent; }
+.progress { margin-top: 18px; display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--mute); }
+.progress .track { flex: 1; height: 4px; border-radius: 2px; background: rgba(27,34,51,.1); overflow: hidden; }
+.progress .track i { display: block; height: 100%; width: 56%; background: var(--ink); border-radius: 2px; }
+</style></head><body>
+
+<!-- shared pieces -->
+<template id="bar">
+  <div class="bar"><span class="lang">English <svg width="14" height="14" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span>
+    <span class="wb"><svg width="15" height="15" viewBox="0 0 24 24"><path d="M5 12h14"/></svg></span>
+    <span class="wb"><svg width="14" height="14" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="1.5"/></svg></span>
+    <span class="wb"><svg width="15" height="15" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></span></div>
+</template>
+<template id="side">
+  <div class="side">
+    <div class="brand"><img src="file:///C:/prj/glass-home/docs/assets/mark.svg" width="20" height="17">Glass Home</div>
+    <div class="device"><svg class="ic" width="20" height="20" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 20.500h8"/></svg>
+      <div><div class="n">Fire TV Stick Lite</div><div class="m">Fire OS 7 · 192.168.1.20</div></div>
+      <svg class="x" width="17" height="17" viewBox="0 0 24 24"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 8l-4 4 4 4M6 12h10"/></svg></div>
+    <div class="nav">
+      <a data-k="overview"><svg width="18" height="18" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>Overview</a>
+      <a data-k="debloat"><svg width="18" height="18" viewBox="0 0 24 24"><path d="M4 5h16l-6 7.500v5.500l-4 2v-7.500z"/></svg>Debloat<span class="s">On</span></a>
+      <a data-k="ui"><svg width="18" height="18" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 15.500h10"/></svg>Glass UI<span class="s">0.2.0</span></a>
+      <a data-k="restore"><svg width="18" height="18" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.300-5.600M4 4v5h5"/></svg>Restore</a>
+    </div>
+    <div class="grow"></div>
+    <div class="meta"><span>Version 0.2.2</span><span>GitHub</span></div>
+  </div>
+</template>
+
+<!-- 1 connect -->
+<div><div class="cap">1 · Connect<small>found TVs as a table, the address field and the three TV steps on one screen</small></div>
+<div class="win" id="w1"><div class="sky"></div>
+  <div class="brand" style="position:absolute;left:12px;top:0;z-index:3"><img src="file:///C:/prj/glass-home/docs/assets/mark.svg" width="20" height="17">Glass Home</div>
+  <div class="main wide"><div class="col">
+    <h1 style="margin-top:34px">Connect your Fire TV</h1>
+    <p class="sub">Fire TVs on this network with ADB debugging on appear here by themselves.</p>
+    <div class="card" style="margin-top:24px">
+      <div class="thead"><span>Name</span><span>Model</span><span>Address</span><span></span></div>
+      <div class="trow sel"><span class="nm"><svg width="18" height="18" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 20.500h8"/></svg>Living Room Fire TV</span><span class="c2">Fire TV Stick Lite</span><span class="c3">192.168.1.20</span><span class="c4"><span class="btn small primary" style="height:30px;padding:0 14px;font-size:13px">Connect</span></span></div>
+      <div class="trow"><span class="nm"><svg width="18" height="18" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 20.500h8"/></svg>Fire TV Cube</span><span class="c2">Fire TV Cube</span><span class="c3">192.168.1.31</span><span class="c4">ADB debugging is off</span></div>
+      <div class="trow dim"><span class="nm"><svg width="18" height="18" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 20.500h8"/></svg>Living Room TV</span><span class="c2">Google TV</span><span class="c3">192.168.1.28</span><span class="c4">Not supported</span></div>
+    </div>
+    <div class="under"><div class="field">192.168.x.x</div><span class="btn" style="height:38px">Connect by address</span><span style="flex:1"></span>
+      <span class="link"><svg width="15" height="15" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.300-5.600M20 4v5h-5"/></svg>Search again</span></div>
+    <div class="label" style="margin-top:44px">On the TV, once</div>
+    <div class="card howto">
+      <div><b><em>1</em>Become a developer</b>Settings › My Fire TV › About: press OK on the device name seven times.</div>
+      <div><b><em>2</em>Turn on ADB debugging</b>My Fire TV › Developer options › ADB debugging.</div>
+      <div><b><em>3</em>Allow this computer</b>The TV asks once after Connect. Tick “Always allow”, then OK.</div>
+    </div>
+  </div></div>
+</div></div>
+
+<!-- 2 overview -->
+<div><div class="cap">2 · Overview<small>the state of the TV at a glance; every row leads to its page</small></div>
+<div class="win" id="w2" data-nav="overview"><div class="sky"></div>
+  <div class="main">
+    <h1>Fire TV Stick Lite</h1>
+    <p class="sub">Nothing in the system itself changes. Everything can be restored.</p>
+    <div class="label">On this TV</div>
+    <div class="card">
+      <div class="row"><div class="t"><div class="n">Debloat</div><div class="d">34 Amazon packages off, 6 background services throttled</div></div><div class="v">On<svg width="16" height="16" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div></div>
+      <div class="row"><div class="t"><div class="n">DNS filter</div><div class="d">381 ad and tracking hosts blocked on the TV itself</div></div><div class="v">Active<svg width="16" height="16" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div></div>
+      <div class="row"><div class="t"><div class="n">Glass UI</div><div class="d">The Home button opens Glass Home</div></div><div class="v">0.2.0 installed<svg width="16" height="16" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div></div>
+      <div class="row"><div class="t"><div class="n">Settings backup</div><div class="d">Taken before the first Debloat; kept on this computer and on the TV</div></div><div class="v">Saved<svg width="16" height="16" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div></div>
+    </div>
+    <div class="label">Connection</div>
+    <div class="card">
+      <div class="row"><div class="t"><div class="n">ADB debugging</div><div class="d">While it is on, devices this TV has allowed can control it. Turn it off when you are done.</div></div><span class="btn rose">Turn off…</span></div>
+    </div>
+  </div>
+</div></div>
+
+<!-- 3 glass ui -->
+<div><div class="cap">3 · Glass UI<small>a settings page instead of a sliding panel: real controls, the action always bottom right</small></div>
+<div class="win" id="w3" data-nav="ui"><div class="sky"></div>
+  <div class="main">
+    <h1>Glass UI</h1>
+    <p class="sub">The home screen for your Fire TV. Everything here can also be changed on the TV later.</p>
+    <div class="label">Layout</div>
+    <div class="layouts">
+      <div class="lay on"><div class="th"><i class="g" style="left:13%;right:13%;bottom:11px;height:24px"></i><i style="left:19%;bottom:16px;width:15%;height:14px"></i><i style="left:37%;bottom:16px;width:15%;height:14px"></i><i style="left:55%;bottom:16px;width:15%;height:14px"></i></div><div class="nm">Dock</div></div>
+      <div class="lay"><div class="th"><i class="g" style="left:11px;top:13px;width:58%;height:18px"></i><i style="left:16px;top:17px;width:16px;height:10px"></i><i style="left:16px;top:39px;width:16px;height:10px;opacity:.6"></i><i style="left:16px;top:61px;width:16px;height:10px;opacity:.6"></i></div><div class="nm">List</div></div>
+      <div class="lay"><div class="th"><i style="left:14px;top:13px;width:26px;height:15px"></i><i style="left:14px;top:36px;width:26px;height:15px;opacity:.6"></i><i style="left:14px;top:59px;width:26px;height:15px;opacity:.6"></i><i style="left:47%;top:33px;width:32%;height:10px"></i></div><div class="nm">Icons</div></div>
+    </div>
+    <div class="label">Appearance</div>
+    <div class="card">
+      <div class="row" style="padding-top:12px;padding-bottom:10px"><div class="t"><div class="n">Colours</div><div class="d">Auto takes the glass colour from the wallpaper.</div></div>
+        <div class="chips">
+          <div class="chip"><div class="c"><i class="g" style="background:rgba(255,255,255,.24)"></i><i class="f" style="background:rgba(255,255,255,.66)"></i></div>Neutral</div>
+          <div class="chip on"><div class="c"><i class="g" style="background:rgba(214,182,150,.36)"></i><i class="f" style="background:rgba(232,196,160,.84)"></i></div>Auto</div>
+          <div class="chip"><div class="c"><i class="g" style="background:rgba(150,220,200,.32)"></i><i class="f" style="background:rgba(170,230,210,.84)"></i></div>Mint</div>
+          <div class="chip"><div class="c"><i class="g" style="background:rgba(230,205,160,.32)"></i><i class="f" style="background:rgba(240,215,170,.84)"></i></div>Sand</div>
+          <div class="chip"><div class="c" style="background:linear-gradient(135deg,#e4defa,#dff4ee)"><i class="g" style="background:rgba(255,255,255,.8)"></i><i class="f" style="background:rgba(42,49,80,.7)"></i></div>Lavender</div>
+        </div></div>
+      <div class="row"><div class="t"><div class="n">Wallpaper</div><div class="d">Your own photo, cropped to 16:9 and sent to the TV.</div></div><div class="photo"></div><span class="btn"><svg width="15" height="15" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>Choose photo…</span></div>
+      <div class="row"><div class="t"><div class="n">Tiles</div></div><div class="seg"><span>Original banners</span><span class="on">Glass symbols</span></div></div>
+      <div class="row"><div class="t"><div class="n">Arrows beside the dock</div><div class="d">Shown where more apps wait on that side.</div></div><div class="sw"></div></div>
+    </div>
+    <div class="actions"><span class="note">Installs version 0.2.0. Your apps and settings on the TV are kept.</span><span class="btn primary">Update</span></div>
+  </div>
+</div></div>
+
+<!-- 4 run -->
+<div><div class="cap">4 · A task running<small>steps in place of the settings, one quiet progress line, no spinner show</small></div>
+<div class="win" id="w4" data-nav="debloat"><div class="sky"></div>
+  <div class="main">
+    <h1>Debloat</h1>
+    <p class="sub">Do not turn the Fire TV off now. The TV restarts once on its own.</p>
+    <div class="label">Steps</div>
+    <div class="card">
+      <div class="step"><svg width="17" height="17" viewBox="0 0 24 24"><path d="M5 12.500l4.500 4.500L19 7.500"/></svg>Back up settings<span class="v">saved</span></div>
+      <div class="step"><svg width="17" height="17" viewBox="0 0 24 24"><path d="M5 12.500l4.500 4.500L19 7.500"/></svg>Turn off Amazon packages<span class="v">34 off</span></div>
+      <div class="step"><svg width="17" height="17" viewBox="0 0 24 24"><path d="M5 12.500l4.500 4.500L19 7.500"/></svg>Remove selected apps<span class="v">none selected</span></div>
+      <div class="step"><svg width="17" height="17" viewBox="0 0 24 24"><path d="M5 12.500l4.500 4.500L19 7.500"/></svg>Throttle background services<span class="v">6 services</span></div>
+      <div class="step now"><svg width="17" height="17" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg><b style="font-weight:520">Privacy settings</b><span class="v">9 of 13</span></div>
+      <div class="step wait"><svg width="17" height="17" viewBox="0 0 24 24"></svg>Set up DNS filter</div>
+      <div class="step wait"><svg width="17" height="17" viewBox="0 0 24 24"></svg>Restart</div>
+      <div class="step wait"><svg width="17" height="17" viewBox="0 0 24 24"></svg>Check</div>
+    </div>
+    <div class="progress"><div class="track"><i></i></div>Step 5 of 8</div>
+    <div class="actions"><span class="note">You can keep using this window; the other pages are locked until this is done.</span><span class="btn primary" style="opacity:.4">Done</span></div>
+  </div>
+</div></div>
+
+<script>
+for (const w of document.querySelectorAll('.win')) {
+  w.appendChild(document.getElementById('bar').content.cloneNode(true));
+  if (w.dataset.nav) {
+    w.insertBefore(document.getElementById('side').content.cloneNode(true), w.querySelector('.main'));
+    w.querySelector('.nav a[data-k="' + w.dataset.nav + '"]').classList.add('on');
+  }
+}
+</script>
+</body></html>

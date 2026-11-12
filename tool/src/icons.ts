@@ -25,6 +25,13 @@ export const icon = {
   press: (s?: number) => svg('<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3"/>', s),
   toggle: (s?: number) => svg('<rect x="3" y="7" width="18" height="10" rx="5"/><circle cx="16" cy="12" r="2.5"/>', s),
   wifi: (s?: number) => svg('<path d="M4.5 10a11 11 0 0 1 15 0M7.5 13.2a6.5 6.5 0 0 1 9 0"/><path d="M12 17h.01"/>', s),
+  overview: (s?: number) => svg('<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>', s),
+  filter: (s?: number) => svg('<path d="M4 5h16l-6 7.5V18l-4 2v-7.5z"/>', s),
+  screen: (s?: number) => svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 15.5h10"/>', s),
+  undo: (s?: number) => svg('<path d="M4 12a8 8 0 1 0 2.3-5.6"/><path d="M4 4v5h5"/>', s),
+  leave: (s?: number) => svg('<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 8l-4 4 4 4M6 12h10"/>', s),
+  back: (s?: number) => svg('<path d="M14 7l-5 5 5 5"/>', s),
+  arrow: (s?: number) => svg('<path d="M5 12h14M13 6l6 6-6 6"/>', s),
 };
 
 /** The app's mark: the rope from the app icon, without its plate. */
