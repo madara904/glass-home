@@ -17,7 +17,7 @@ tauri-build = { version = "2", features = [] }
 # adb over the network without the adb program; the TCP device and nothing else.
 adb_client = { version = "3.2.3", default-features = false }
 # App names from an APK's manifest and resources (instead of aapt2). 1.0.13 builds on Rust 1.94.
-apk-info = "=1.0.13"
+apk-info = "=1.1.1"
 # The key a TV remembers this computer by, created once.
 rsa = "0.9"
 dns-lookup = "4.0.2"
