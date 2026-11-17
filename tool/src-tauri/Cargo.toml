@@ -19,7 +19,7 @@ adb_client = { version = "3.2.3", default-features = false }
 # App names from an APK's manifest and resources (instead of aapt2). 1.0.13 builds on Rust 1.94.
 apk-info = "=1.0.13"
 # The key a TV remembers this computer by, created once.
-rsa = "0.9"
+rsa = "0.10"
 dns-lookup = "4.0.2"
 mdns-sd = "0.21.7"
 serde = { version = "1.0.229", features = ["derive"] }
